@@ -1,0 +1,7 @@
+languageCode = "en-us"
+title = "Stew's Recipe Book"
+theme = "recipes"
+
+[params]
+  author = "Stewart Platt"
+  description = "Stew's Recipe Book"

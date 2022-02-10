@@ -1,0 +1,6 @@
+[submodule "site/themes/anatole"]
+	path = site/themes/anatole
+	url = https://github.com/lxndrblz/anatole.git
+[submodule "site/themes/recipe-book"]
+	path = site/themes/recipe-book
+	url = https://github.com/rametta/recipe-book.git
