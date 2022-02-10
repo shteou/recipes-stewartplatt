@@ -13,7 +13,7 @@ featured_image: "/flags/it.svg"
 
 - 4 - Chicken breasts
 - 4 oz - Marsala Wine (or Cream Sherry)
-- 4 oz - Unsalted Butter
+- 4 oz - Salted Butter
 - 1 - Large onion
 
 Multiply as needed.
