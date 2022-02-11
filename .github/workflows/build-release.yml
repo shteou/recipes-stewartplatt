@@ -36,13 +36,15 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Get next version
-        id: next_version
-        uses: hennejg/github-tag-action@v4.1.jh1
-#         if: github.event_name != 'pull_request'
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          dry_run: true
+      
+      - name: Bump version and push tag
+        uses: anothrNick/github-tag-action@1.36.0
+        id: semantic_version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          DRY_RUN: true
+
           
       # Workaround: https://github.com/docker/build-push-action/issues/461
       - name: Setup Docker buildx
@@ -74,7 +76,7 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.next_version.outputs.new_version }}
+          tags: ${{ steps.semantic_version.outputs.tag }}
           labels: ${{ steps.meta.outputs.labels }}
 
       # Sign the resulting Docker image digest except on PRs.
@@ -91,7 +93,8 @@ jobs:
         run: cosign sign ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-and-push.outputs.digest }}
 
       - name: Bump version and push tag
+        uses: anothrNick/github-tag-action@1.36.0
         if: github.event_name != 'pull_request'
-        uses: hennejg/github-tag-action@v4.1.jh1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
