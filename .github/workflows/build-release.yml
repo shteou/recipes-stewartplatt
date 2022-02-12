@@ -24,7 +24,8 @@ jobs:
 
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # Contents write required for releasing to gh-pages
+      contents: write
       packages: write
       # This is used to complete the identity challenge
       # with sigstore/fulcio when running outside of PRs.
@@ -93,14 +94,12 @@ jobs:
         run: |
           sed -i "s/version: .*/version: ${{ steps.semantic_version.outputs.tag }}/g" charts/recipes-stewartplatt/Chart.yaml
           sed -i "s/appVersion: .*/version: ${{ steps.semantic_version.outputs.tag }}/g" charts/recipes-stewartplatt/Chart.yaml
-          cat charts/recipes-stewartplatt/Chart.yaml
 
-
-      - name: Publish Helm charts
-        uses: stefanprodan/helm-gh-pages@master
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.3.0
         if: github.event_name != 'pull_request'
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
