@@ -26,6 +26,7 @@ jobs:
     permissions:
       # Contents write required for releasing to gh-pages
       contents: write
+      pages: write
       packages: write
       # This is used to complete the identity challenge
       # with sigstore/fulcio when running outside of PRs.
@@ -39,9 +40,6 @@ jobs:
 
       - name: Fix .git permissions
         run: |
-          set -x
-          ls -al .git/objects/
-          echo $(id -un)
           chown -R $(id -un):$(id -gn) .git/objects/
 
 
