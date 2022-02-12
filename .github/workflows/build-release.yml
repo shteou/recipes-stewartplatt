@@ -38,6 +38,11 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Fix .git permissions
+        run: |
+          find .git/ -exec stat --format="%G %n" {} + |grep root
+          chown -R $(id -un):$(id -gn) .git/objects/
+
 
       - name: Configure Git
         if: github.event_name != 'pull_request'
