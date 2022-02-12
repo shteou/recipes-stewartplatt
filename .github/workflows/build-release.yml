@@ -99,7 +99,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           sed -i "s/version: .*/version: ${{ steps.semantic_version.outputs.new_tag }}/g" charts/recipes-stewartplatt/Chart.yaml
-          sed -i "s/appVersion: .*/version: ${{ steps.semantic_version.outputs.new_tag }}/g" charts/recipes-stewartplatt/Chart.yaml
+          sed -i "s/appVersion: .*/appVersion: ${{ steps.semantic_version.outputs.new_tag }}/g" charts/recipes-stewartplatt/Chart.yaml
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.3.0
