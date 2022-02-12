@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       # Contents write required for releasing to gh-pages
-      contents: write
+      contents: read
       pages: write
       packages: write
       # This is used to complete the identity challenge
