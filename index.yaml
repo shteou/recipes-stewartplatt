@@ -1,0 +1,13 @@
+apiVersion: v1
+entries:
+  recipes-stewartplatt:
+  - apiVersion: v2
+    created: "2022-02-12T18:58:44.536929565Z"
+    description: A Helm chart for Kubernetes
+    digest: f42b91821a8448f249eff7c5ef650ad8995fd4fb97c018b066087bf54d442276
+    name: recipes-stewartplatt
+    type: application
+    urls:
+    - https://github.com/shteou/recipes-stewartplatt/releases/download/recipes-stewartplatt-v0.8.0/recipes-stewartplatt-v0.8.0.tgz
+    version: v0.8.0
+generated: "2022-02-12T18:58:44.536973868Z"
