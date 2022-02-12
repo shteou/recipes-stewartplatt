@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   recipes-stewartplatt:
   - apiVersion: v2
+    appVersion: v0.9.4
+    created: "2022-02-12T19:08:29.044091501Z"
+    description: A Helm chart for Kubernetes
+    digest: 3c959377fbc0538c2a44df6f5e0debc75021816b7e1ce27241480f37df62f594
+    name: recipes-stewartplatt
+    type: application
+    urls:
+    - https://github.com/shteou/recipes-stewartplatt/releases/download/recipes-stewartplatt-v0.9.4/recipes-stewartplatt-v0.9.4.tgz
+    version: v0.9.4
+  - apiVersion: v2
     created: "2022-02-12T19:05:44.204920582Z"
     description: A Helm chart for Kubernetes
     digest: 2c4400b9af2369bab090a055863f5becfab6661294adb5e0e9f46de9678fbf53
@@ -19,4 +29,4 @@ entries:
     urls:
     - https://github.com/shteou/recipes-stewartplatt/releases/download/recipes-stewartplatt-v0.8.0/recipes-stewartplatt-v0.8.0.tgz
     version: v0.8.0
-generated: "2022-02-12T19:05:44.204927982Z"
+generated: "2022-02-12T19:08:29.044104501Z"
