@@ -93,12 +93,14 @@ jobs:
         run: |
           sed -i "s/version: .*/version: ${{ steps.semantic_version.outputs.tag }}/g" charts/recipes-stewartplatt/Chart.yaml
           sed -i "s/appVersion: .*/version: ${{ steps.semantic_version.outputs.tag }}/g" charts/recipes-stewartplatt/Chart.yaml
+          cat charts/recipes-stewartplatt/Chart.yaml
 
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.3.0
+
+      - name: Publish Helm charts
+        uses: stefanprodan/helm-gh-pages@master
         if: github.event_name != 'pull_request'
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
