@@ -40,7 +40,9 @@ jobs:
 
       - name: Fix .git permissions
         run: |
-          find .git/ -exec stat --format="%G %n" {} + |grep root
+          set -x
+          ls -al .git/objects/
+          echo $(id -un)
           chown -R $(id -un):$(id -gn) .git/objects/
 
 
@@ -98,8 +100,8 @@ jobs:
       - name: Update chart version
         if: github.event_name != 'pull_request'
         run: |
-          sed -i "s/version: .*/version: ${{ steps.semantic_version.outputs.tag }}/g" charts/recipes-stewartplatt/Chart.yaml
-          sed -i "s/appVersion: .*/version: ${{ steps.semantic_version.outputs.tag }}/g" charts/recipes-stewartplatt/Chart.yaml
+          sed -i "s/version: .*/version: ${{ steps.semantic_version.outputs.new_tag }}/g" charts/recipes-stewartplatt/Chart.yaml
+          sed -i "s/appVersion: .*/version: ${{ steps.semantic_version.outputs.new_tag }}/g" charts/recipes-stewartplatt/Chart.yaml
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.3.0
