@@ -30,7 +30,7 @@ featured_image: "/flags/ye.svg"
 1. Dice the tomato and/or pepper
 1. Combine the above ingredients in a blender and blitz
 1. Add the cumin and the juice of the lime
-1. Add salt and some pepper to taste
+1. Add salt and pepper to taste
 1. Decant into a clean jar/pot and finish with a layer of oil
 
 ## Serving suggestions
