@@ -2,6 +2,11 @@
 
 Stewart Platt's recipe sub-site.
 
+Built with [Hugo](https://gohugo.io) (see `Dockerfile`). This repo is normally
+worked on as a submodule of the [websites](https://gitlab.com/shteou/websites)
+monorepo, which builds it and deploys the static output to Cloudflare Pages
+via `deploy/deploy.py` - see that repo's README for details.
+
 ## Attribution
 
 Flag images are from [lipis' flag-icons](https://github.com/lipis/flag-icons) repository. These
