@@ -7,16 +7,20 @@ draft: false
 time: "2h"
 tags: ["italian", "chicken"]
 featured_image: "/flags/it.svg"
+servings: 4
+ingredients:
+  - name: Chicken breasts
+    quantity: 4
+  - name: Marsala Wine
+    quantity: 4
+    unit: oz
+    note: or Cream Sherry
+  - name: Salted Butter
+    quantity: 4
+    unit: oz
+  - name: Large onion
+    quantity: 1
 ---
-
-## Ingredients
-
-- 4 - Chicken breasts
-- 4 oz - Marsala Wine (or Cream Sherry)
-- 4 oz - Salted Butter
-- 1 - Large onion
-
-Multiply as needed.
 
 ## Directions
 

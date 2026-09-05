@@ -7,20 +7,28 @@ draft: false
 time: "20m"
 tags: ["yemeni", "israeli", "condiment", "vegetarian", "vegan"]
 featured_image: "/flags/ye.svg"
+servings: 1
+ingredients:
+  - name: Mild-medium fruity chillis
+    quantity: 300
+    unit: g
+  - name: Garlic cloves
+    quantity: 9
+  - name: Cumin
+    quantity: 2
+    unit: tsp
+  - name: Lime
+    quantity: 1
+  - name: Coriander
+    quantity: 1
+    unit: handful
+  - name: Tomato
+    optional: true
+  - name: Pepper
+    optional: true
+  - name: Extra Virgin Olive Oil
+  - name: Salt & Pepper
 ---
-
-## Ingredients
-
-1. 300g mild-medium fruity chillis
-1. 9 - Garlic cloves
-1. 2 tsp - Cumin
-1. 1 - Lime
-1. 1 handful - Coriander
-1. 1 - Tomato (optional)
-1. 1 - Pepper (optional)
-1. Extra Virgin Olive Oil
-1. Salt & Pepper
-
 
 ## Directions
 

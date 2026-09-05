@@ -7,29 +7,61 @@ draft: false
 time: "30m"
 tags: ["indian", "vegetarian", "lentils"]
 featured_image: "/flags/in.svg"
+servings: 4
+ingredients:
+  - name: Chana dal
+    quantity: 0.5
+    unit: cup
+  - name: Mung dal
+    quantity: 0.5
+    unit: cup
+    note: split, yellow
+  - name: Water
+    quantity: 3
+    unit: cup
+    note: for cooking dal
+  - name: Turmeric powder
+    quantity: 0.5
+    unit: tsp
+  - name: Salt
+    quantity: 1
+    unit: tsp
+  - name: Bay leaf
+    quantity: 1
+  - name: Ghee
+    quantity: 2
+    unit: tbsp
+  - name: Cumin seeds
+    quantity: 1
+    unit: tsp
+  - name: Curry leaves
+    quantity: 8
+  - name: Garlic cloves
+    quantity: 4
+    note: minced
+  - name: Onion
+    quantity: 1
+    unit: medium
+    note: finely chopped
+  - name: Tomato
+    quantity: 1
+    note: chopped, plum or regular
+  - name: Coriander powder
+    quantity: 1
+    unit: tsp
+  - name: Red chili powder
+    quantity: 0.5
+    unit: tsp
+  - name: Garam masala
+    quantity: 0.3
+    unit: tsp
+  - name: Pinch of cumin powder
+    optional: true
+  - name: Dry chilli
+    optional: true
 ---
 
-Comforting, protein-rich, ready in about 30 minutes. Serves 4.
-
-## Ingredients
-
-1. 0.5 cups - Chana dal
-1. 0.5 cups - Mung dal (split, yellow)
-1. 3 cups - Water (for cooking dal)
-1. 0.5 tsp - Turmeric powder
-1. 1 tsp - Salt
-1. 1 - Bay leaf
-1. 2 tbsp - Ghee
-1. 1 tsp - Cumin seeds
-1. 8 - Curry leaves
-1. 4 - Garlic cloves, minced
-1. 1 medium - Onion, finely chopped
-1. 1 - Tomato, chopped (plum or regular)
-1. 1 tsp - Coriander powder
-1. 0.5 tsp - Red chili powder
-1. 0.3 tsp - Garam masala
-1. Optional - Pinch of cumin powder
-1. Optional - Dry chilli
+Comforting, protein-rich, ready in about 30 minutes.
 
 ## Directions
 
