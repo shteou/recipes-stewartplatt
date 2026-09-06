@@ -20,7 +20,7 @@ if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)
 .steps-kitchen-single {
   font-size: 1.35rem;
   line-height: 1.5;
-  margin-top: 0;
+  margin-top: 1rem;
 }
 .steps-kitchen-checklist label,
 .steps-kitchen-single label {
@@ -31,12 +31,13 @@ if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)
 }
 .steps-kitchen-checklist input[type="checkbox"],
 .steps-kitchen-single input[type="checkbox"] {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--color-accent);
   flex-shrink: 0;
 }
 .kitchen-submode-switcher {
-  margin: 0;
+  margin: 0 0 1rem;
 }
 .kitchen-submode-switcher button,
 .steps-kitchen-nav button {
@@ -73,7 +74,7 @@ exports[`view component snapshots (mixed-dal-tadka, default view state) > StepsK
 .steps-kitchen-single {
   font-size: 1.35rem;
   line-height: 1.5;
-  margin-top: 0;
+  margin-top: 1rem;
 }
 .steps-kitchen-checklist label,
 .steps-kitchen-single label {
@@ -84,12 +85,13 @@ exports[`view component snapshots (mixed-dal-tadka, default view state) > StepsK
 }
 .steps-kitchen-checklist input[type="checkbox"],
 .steps-kitchen-single input[type="checkbox"] {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--color-accent);
   flex-shrink: 0;
 }
 .kitchen-submode-switcher {
-  margin: 0;
+  margin: 0 0 1rem;
 }
 .kitchen-submode-switcher button,
 .steps-kitchen-nav button {
@@ -110,7 +112,7 @@ exports[`view component snapshots (mixed-dal-tadka, default view state) > StepsK
 .steps-kitchen-single {
   font-size: 1.35rem;
   line-height: 1.5;
-  margin-top: 0;
+  margin-top: 1rem;
 }
 .steps-kitchen-checklist label,
 .steps-kitchen-single label {
@@ -121,12 +123,13 @@ exports[`view component snapshots (mixed-dal-tadka, default view state) > StepsK
 }
 .steps-kitchen-checklist input[type="checkbox"],
 .steps-kitchen-single input[type="checkbox"] {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--color-accent);
   flex-shrink: 0;
 }
 .kitchen-submode-switcher {
-  margin: 0;
+  margin: 0 0 1rem;
 }
 .kitchen-submode-switcher button,
 .steps-kitchen-nav button {

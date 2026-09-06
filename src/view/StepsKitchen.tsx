@@ -56,7 +56,7 @@ const KITCHEN_MODE_STYLES = `
 .steps-kitchen-single {
   font-size: 1.35rem;
   line-height: 1.5;
-  margin-top: 0;
+  margin-top: 1rem;
 }
 .steps-kitchen-checklist label,
 .steps-kitchen-single label {
@@ -67,12 +67,13 @@ const KITCHEN_MODE_STYLES = `
 }
 .steps-kitchen-checklist input[type="checkbox"],
 .steps-kitchen-single input[type="checkbox"] {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--color-accent);
   flex-shrink: 0;
 }
 .kitchen-submode-switcher {
-  margin: 0;
+  margin: 0 0 1rem;
 }
 .kitchen-submode-switcher button,
 .steps-kitchen-nav button {
