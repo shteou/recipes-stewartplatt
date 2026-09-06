@@ -145,6 +145,8 @@ function init(): void {
     stepsView?: StepsViewMode;
     activeSubstitutions?: string[];
     checkedKeys?: { mise?: string[]; kitchen?: string[] };
+    kitchenSubmode?: KitchenSubmode;
+    kitchenStepIndex?: number;
   }
 
   function loadStoredState(): StoredViewState | null {
@@ -278,9 +280,15 @@ function init(): void {
   for (const key of stored?.checkedKeys?.kitchen ?? []) checkedKeys.kitchen.add(key);
 
   // Persists the full restorable state (servings/units/steps-view/
-  // substitutions/checklist progress) to localStorage — called after every
-  // change to any of those, mirroring `syncUrl`'s "call after every change"
-  // convention. Also wrapped defensively; see the loadStoredState comment.
+  // substitutions/checklist progress/kitchen sub-view+step position) to
+  // localStorage — called after every change to any of those, mirroring
+  // `syncUrl`'s "call after every change" convention. Also wrapped
+  // defensively; see the loadStoredState comment.
+  //
+  // Deliberately excludes the timer's own running state (`kitchenTimer`) —
+  // timers require an explicit manual start (see below), so restoring one
+  // as already-running after a reload would contradict that; the user just
+  // presses Start again for the same idle step.
   function persistState(): void {
     try {
       const data: StoredViewState = {
@@ -292,6 +300,8 @@ function init(): void {
           mise: [...checkedKeys.mise],
           kitchen: [...checkedKeys.kitchen],
         },
+        kitchenSubmode,
+        kitchenStepIndex,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
@@ -346,16 +356,22 @@ function init(): void {
   // `kitchenStepIndex` indexes into `vm.steps` (the full, unfiltered list —
   // see `StepsKitchen.tsx`'s docstring), not `vm.activeSteps`.
   //
-  // Neither this nor `kitchenSubmode` (nor the timer state below) is
-  // persisted to localStorage: they're transient "where am I right now"
-  // navigation position, not a saved choice, and a reload restoring a
-  // countdown for a step the user isn't currently looking at (since
-  // `kitchenSubmode`/`kitchenStepIndex` themselves reset to their defaults
-  // on load) would be more confusing than helpful.
+  // Both are restored from localStorage (via `persistState`/`stored` above)
+  // so returning to a recipe resumes exactly where Kitchen mode was left —
+  // clamped against the recipe's own step count in case content changed
+  // since the value was saved. The timer's *running* state is deliberately
+  // NOT restored (see `persistState`'s comment): a restored idle step always
+  // starts back in its not-yet-started state, requiring a fresh manual
+  // Start.
   // -------------------------------------------------------------------
 
-  let kitchenSubmode: KitchenSubmode = "checklist";
+  let kitchenSubmode: KitchenSubmode =
+    stored?.kitchenSubmode === "single" || stored?.kitchenSubmode === "checklist" ? stored.kitchenSubmode : "checklist";
   let kitchenStepIndex = 0;
+  if (stored && typeof stored.kitchenStepIndex === "number" && Number.isInteger(stored.kitchenStepIndex)) {
+    const maxIndex = Math.max(0, (recipe.steps?.length ?? 1) - 1);
+    kitchenStepIndex = Math.min(Math.max(stored.kitchenStepIndex, 0), maxIndex);
+  }
   let lastVm: ReturnType<typeof present> | null = null;
 
   // -------------------------------------------------------------------
@@ -378,11 +394,19 @@ function init(): void {
   // by a backgrounded tab still reports the correct remaining time the
   // moment it's checked again — exactly the same reasoning as this file's
   // wake-lock handling below.
+  //
+  // Timers require an explicit manual start: arriving at an idle step (via
+  // Back/Next, a sub-view switch, or a restored `kitchenStepIndex`/
+  // `kitchenSubmode`) only ever prepares a *not-started* timer entry
+  // (`startedAt: null`) showing its full duration — it never starts
+  // counting down on its own. Ticking begins only from the
+  // `data-kitchen-timer-start` click handler below.
   // -------------------------------------------------------------------
 
   interface KitchenTimer {
     stepIndex: number;
-    startedAt: number;
+    /** `null` until the user explicitly presses Start. */
+    startedAt: number | null;
     durationMs: number;
     finished: boolean;
   }
@@ -444,7 +468,7 @@ function init(): void {
   function startKitchenTimerTicking(): void {
     if (kitchenTimerIntervalId !== null) return;
     kitchenTimerIntervalId = window.setInterval(() => {
-      if (!kitchenTimer) {
+      if (!kitchenTimer || kitchenTimer.startedAt === null) {
         stopKitchenTimerTicking();
         return;
       }
@@ -459,23 +483,49 @@ function init(): void {
   }
 
   // Builds the `timer` prop for whichever step `kitchenStepIndex` currently
-  // points at — `null` unless that exact step has a live/finished timer.
+  // points at — `null` unless that exact step has a prepared timer entry
+  // (started, running, or finished).
   function currentTimerProp(): KitchenTimerState | null {
     if (!kitchenTimer || kitchenTimer.stepIndex !== kitchenStepIndex) return null;
+    if (kitchenTimer.startedAt === null) {
+      return {
+        stepIndex: kitchenTimer.stepIndex,
+        remainingMs: kitchenTimer.durationMs,
+        durationMs: kitchenTimer.durationMs,
+        status: "not-started",
+      };
+    }
     const remainingMs = Math.max(0, kitchenTimer.durationMs - (Date.now() - kitchenTimer.startedAt));
+    const finished = kitchenTimer.finished || remainingMs <= 0;
     return {
       stepIndex: kitchenTimer.stepIndex,
       remainingMs,
       durationMs: kitchenTimer.durationMs,
-      finished: kitchenTimer.finished || remainingMs <= 0,
+      status: finished ? "finished" : "running",
     };
   }
 
-  // Starts (or resumes ticking) a timer for the currently-displayed step, if
-  // it's `idle` and has a derivable duration; stops ticking (without
-  // discarding timer state — navigating back to it later should resume, not
-  // restart) when the current step isn't the one the running timer belongs
-  // to. Called after every Back/Next/sub-view-switch interaction.
+  // Requests notification permission tied to a genuine user gesture (a
+  // Start/Restart click) — browsers require this for the prompt to appear
+  // at all — and only asks once (`"default"` means "never asked").
+  function requestNotificationPermissionIfUnasked(): void {
+    try {
+      if ("Notification" in window && Notification.permission === "default") {
+        void Notification.requestPermission().catch(() => {});
+      }
+    } catch {
+      // Notification API unsupported — silently skip
+    }
+  }
+
+  // Prepares (without starting) a timer entry for the currently-displayed
+  // step if it's `idle` and has a derivable duration, and resumes ticking if
+  // the current step already has an already-*started*, unfinished timer
+  // (e.g. the user navigated away mid-countdown and came back). Never starts
+  // a fresh timer counting down on its own — that only happens from the
+  // explicit `data-kitchen-timer-start` click handler below. Called after
+  // every Back/Next/sub-view-switch interaction, and once on initial load if
+  // a restored `kitchenStepIndex`/`kitchenSubmode` lands on an idle step.
   function syncKitchenTimerForCurrentStep(): void {
     if (!lastVm) return;
     const step = lastVm.steps[kitchenStepIndex];
@@ -484,24 +534,15 @@ function init(): void {
       return;
     }
     if (!kitchenTimer || kitchenTimer.stepIndex !== kitchenStepIndex) {
+      stopKitchenTimerTicking(); // nothing to tick for a fresh, not-yet-started timer
       const durationMinutes = idleDurationMinutes(lastVm, kitchenStepIndex);
       kitchenTimer =
         durationMinutes > 0
-          ? { stepIndex: kitchenStepIndex, startedAt: Date.now(), durationMs: durationMinutes * 60_000, finished: false }
+          ? { stepIndex: kitchenStepIndex, startedAt: null, durationMs: durationMinutes * 60_000, finished: false }
           : null;
-      // Requesting permission here (rather than eagerly on page load) ties
-      // it to a genuine user gesture (the Back/Next/sub-view click that led
-      // here), which browsers require anyway for the prompt to appear at
-      // all — and only asks once (`"default"` means "never asked").
-      try {
-        if (kitchenTimer && "Notification" in window && Notification.permission === "default") {
-          void Notification.requestPermission().catch(() => {});
-        }
-      } catch {
-        // Notification API unsupported — silently skip
-      }
+      return;
     }
-    if (kitchenTimer) startKitchenTimerTicking();
+    if (kitchenTimer.startedAt !== null && !kitchenTimer.finished) startKitchenTimerTicking();
   }
 
   // -------------------------------------------------------------------
@@ -758,7 +799,19 @@ function init(): void {
         if (mode === "single") syncKitchenTimerForCurrentStep();
         else stopKitchenTimerTicking(); // checklist view can't display idle steps/timers at all
         renderKitchenSection();
+        persistState();
       }
+      return;
+    }
+
+    const startBtn = target.closest<HTMLButtonElement>("[data-kitchen-timer-start]");
+    if (startBtn) {
+      if (kitchenTimer && kitchenTimer.stepIndex === kitchenStepIndex && kitchenTimer.startedAt === null) {
+        kitchenTimer.startedAt = Date.now();
+        requestNotificationPermissionIfUnasked();
+        startKitchenTimerTicking();
+      }
+      renderKitchenSection();
       return;
     }
 
@@ -767,6 +820,7 @@ function init(): void {
       if (kitchenTimer && kitchenTimer.stepIndex === kitchenStepIndex) {
         kitchenTimer.startedAt = Date.now();
         kitchenTimer.finished = false;
+        requestNotificationPermissionIfUnasked();
         startKitchenTimerTicking();
       }
       renderKitchenSection();
@@ -780,6 +834,7 @@ function init(): void {
       else if (navBtn.dataset.kitchenStepNav === "back" && kitchenStepIndex > 0) kitchenStepIndex--;
       syncKitchenTimerForCurrentStep();
       renderKitchenSection();
+      persistState();
     }
   });
 
@@ -800,6 +855,14 @@ function init(): void {
   const initialVm = recompute();
   if (servingsValueEl) {
     servingsValueEl.textContent = `${initialVm.servingsDisplay} ${initialVm.servingUnitDisplay}`;
+  }
+  // A restored "single" kitchen sub-mode landing on an idle step needs its
+  // (not-started) timer entry prepared and the section re-rendered to show
+  // it — `recompute()` above already ran `renderStepsSections` once before
+  // `kitchenTimer` existed, so the first paint needs this follow-up.
+  if (kitchenSubmode === "single") {
+    syncKitchenTimerForCurrentStep();
+    renderKitchenSection();
   }
 }
 

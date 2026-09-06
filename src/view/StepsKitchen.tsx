@@ -42,9 +42,11 @@
  * `timer` is likewise supplied by `hydrate.tsx`: this component never touches
  * `Date.now()` or a countdown interval itself, it just renders whatever
  * remaining-time snapshot it's handed for the currently-displayed `idle`
- * step (or nothing, if that step has no active timer / isn't idle). See
- * `hydrate.tsx`'s `syncKitchenTimerForCurrentStep`/`currentTimerProp` for the
- * actual timer state machine.
+ * step (or nothing, if that step has no active timer / isn't idle). Timers
+ * require an explicit manual start — a prepared-but-`"not-started"` timer
+ * renders its full duration alongside a Start button rather than counting
+ * down on its own; see `hydrate.tsx`'s `syncKitchenTimerForCurrentStep`/
+ * `currentTimerProp` for the actual timer state machine.
  *
  * The inline `<style>` block below is this stage's *explicit, narrow*
  * exception to "no CSS yet" (that's Stage 10's job): Kitchen-mode-only
@@ -60,13 +62,14 @@ import type { RecipeViewModel } from "../core/present.js";
 
 export type KitchenSubmode = "checklist" | "single";
 
-/** Ephemeral countdown snapshot for the idle step currently shown by the one-at-a-time sub-view; `null`/absent when that step has no running timer. */
+/** Ephemeral countdown snapshot for the idle step currently shown by the one-at-a-time sub-view; `null`/absent when that step has no prepared timer at all. */
 export interface KitchenTimerState {
   /** Index into `vm.steps` (not `vm.activeSteps`) of the step this timer belongs to. */
   stepIndex: number;
   remainingMs: number;
   durationMs: number;
-  finished: boolean;
+  /** "not-started": prepared but awaiting a manual Start; timers never count down on their own. */
+  status: "not-started" | "running" | "finished";
 }
 
 export interface StepsKitchenProps {
@@ -188,11 +191,17 @@ export function StepsKitchen({ vm, currentIndex = 0, submode = "checklist", time
                 {currentTimer ? (
                   <>
                     <p class="steps-kitchen-timer-display" aria-live="polite">
-                      {currentTimer.finished ? "Time's up!" : formatTimer(currentTimer.remainingMs)}
+                      {currentTimer.status === "finished" ? "Time's up!" : formatTimer(currentTimer.remainingMs)}
                     </p>
-                    <button type="button" data-kitchen-timer-restart={clampedIndex}>
-                      Restart timer
-                    </button>
+                    {currentTimer.status === "not-started" ? (
+                      <button type="button" data-kitchen-timer-start={clampedIndex}>
+                        Start timer
+                      </button>
+                    ) : (
+                      <button type="button" data-kitchen-timer-restart={clampedIndex}>
+                        Restart timer
+                      </button>
+                    )}
                   </>
                 ) : (
                   <p class="steps-kitchen-timer-status">
