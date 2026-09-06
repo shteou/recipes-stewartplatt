@@ -1,0 +1,28 @@
+{
+  "name": "recipes-stewartplatt",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --config vite.client.config.ts && tsx build/index.ts",
+    "test": "vitest run",
+    "test:build": "vitest run --config vitest.build.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^26.4.1",
+    "js-yaml": "^5.4.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.7.2",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "marked": "^18.0.11",
+    "preact": "^10.29.8",
+    "preact-render-to-string": "^6.7.0",
+    "zod": "^4.5.4"
+  }
+}
