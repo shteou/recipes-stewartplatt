@@ -56,6 +56,9 @@ export function RecipePage({ vm, recipe, featuredImageSrc }: RecipePageProps) {
         <SiteBar />
         <main class="page">
         <header>
+          <button type="button" class="reset-page-button" data-reset-page aria-label="Reset page to defaults">
+            Reset
+          </button>
           {featuredImageSrc && <img class="flag-badge" src={featuredImageSrc} alt="" width="48" height="48" />}
           <h1>{vm.title}</h1>
           <p>

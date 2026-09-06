@@ -122,6 +122,67 @@ function init(): void {
 
   const validSubstitutionLabels = new Set((recipe.substitutions ?? []).map((s) => s.label));
 
+  // -------------------------------------------------------------------
+  // localStorage override — restores servings/units/steps-view/
+  // substitutions/checklist-progress from the last visit to this recipe,
+  // scoped by `recipe.slug` (stable across paths, unlike `location.pathname`)
+  // so different recipes never clobber each other's saved state.
+  //
+  // Applied before the URL override below, so an explicit URL query param
+  // (e.g. a shared link with `?servings=8`) always wins over a previously
+  // saved choice — the URL is the more explicit, intentional signal.
+  //
+  // Every localStorage access is wrapped in try/catch: private browsing,
+  // disabled storage, or quota errors must never break the page, exactly
+  // like the JSON.parse guard above and the wake-lock handling below.
+  // -------------------------------------------------------------------
+
+  const STORAGE_KEY = `recipe-view-state:${recipe.slug}`;
+
+  interface StoredViewState {
+    servings?: number;
+    unitSystem?: UnitSystem;
+    stepsView?: StepsViewMode;
+    activeSubstitutions?: string[];
+    checkedKeys?: { mise?: string[]; kitchen?: string[] };
+  }
+
+  function loadStoredState(): StoredViewState | null {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as StoredViewState) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function clearStoredState(): void {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore — nothing to clear if storage isn't available
+    }
+  }
+
+  const stored = loadStoredState();
+  if (stored) {
+    if (typeof stored.servings === "number" && Number.isFinite(stored.servings) && stored.servings > 0) {
+      viewState.servings = stored.servings;
+    }
+    if (stored.unitSystem === "metric" || stored.unitSystem === "imperial" || stored.unitSystem === "as-written") {
+      viewState.unitSystem = stored.unitSystem;
+    }
+    if (stored.stepsView && STEPS_VIEW_MODES.includes(stored.stepsView)) {
+      viewState.stepsView = stored.stepsView;
+    }
+    if (Array.isArray(stored.activeSubstitutions)) {
+      activeSubstitutions.clear();
+      for (const label of stored.activeSubstitutions) {
+        if (validSubstitutionLabels.has(label)) activeSubstitutions.add(label);
+      }
+    }
+  }
+
   {
     const params = new URLSearchParams(location.search);
 
@@ -161,6 +222,23 @@ function init(): void {
     btn.setAttribute("aria-pressed", String(isActive));
   });
 
+  // Same idea for the steps-view switcher: before this stage, `viewState`
+  // could only diverge from the SSR-derived default ("grouped" visible) via
+  // user interaction, so the click handler was the only place `hidden` got
+  // toggled. Now a restored `stepsView` (from localStorage) can disagree
+  // with the DOM on first paint, so it needs the same explicit sync here.
+  for (const mode of STEPS_VIEW_MODES) {
+    const section = stepsSections[mode];
+    if (section) section.hidden = mode !== viewState.stepsView;
+  }
+  switcherNav.querySelectorAll<HTMLButtonElement>("[data-view-target]").forEach((btn) => {
+    btn.setAttribute("aria-pressed", String(btn.dataset.viewTarget === viewState.stepsView));
+  });
+  // A restored "kitchen" stepsView should hold the wake lock immediately,
+  // same as if the user had just clicked into it — `acquireWakeLock` is
+  // declared below but hoisted (function declaration), so this call is safe.
+  if (viewState.stepsView === "kitchen") void acquireWakeLock();
+
   // -------------------------------------------------------------------
   // Sync ViewState -> URL, mirroring the parsing above. Called after every
   // change to servings/unitSystem/activeSubstitutions. Uses replaceState
@@ -196,6 +274,30 @@ function init(): void {
     mise: new Set<string>(),
     kitchen: new Set<string>(),
   };
+  for (const key of stored?.checkedKeys?.mise ?? []) checkedKeys.mise.add(key);
+  for (const key of stored?.checkedKeys?.kitchen ?? []) checkedKeys.kitchen.add(key);
+
+  // Persists the full restorable state (servings/units/steps-view/
+  // substitutions/checklist progress) to localStorage — called after every
+  // change to any of those, mirroring `syncUrl`'s "call after every change"
+  // convention. Also wrapped defensively; see the loadStoredState comment.
+  function persistState(): void {
+    try {
+      const data: StoredViewState = {
+        servings: viewState.servings,
+        unitSystem: viewState.unitSystem,
+        stepsView: viewState.stepsView,
+        activeSubstitutions: [...activeSubstitutions],
+        checkedKeys: {
+          mise: [...checkedKeys.mise],
+          kitchen: [...checkedKeys.kitchen],
+        },
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      // ignore — private browsing, disabled storage, quota, etc.
+    }
+  }
 
   // Tracks which checkbox DOM nodes already have a `change` listener attached
   // — needed because Kitchen mode can now have *two* live checkboxes sharing
@@ -219,6 +321,7 @@ function init(): void {
       box.addEventListener("change", () => {
         if (box.checked) checkedKeys[kind].add(key);
         else checkedKeys[kind].delete(key);
+        persistState();
         // Kitchen mode only: a checklist row and the one-at-a-time view can
         // both display the same step (same `data-key`) at once — keep the
         // other instance's visual checked-state in sync immediately, rather
@@ -344,6 +447,7 @@ function init(): void {
     const vm = recompute();
     if (servingsValueEl) servingsValueEl.textContent = `${vm.servingsDisplay} ${vm.servingUnitDisplay}`;
     syncUrl();
+    persistState();
   }
 
   decreaseBtn?.addEventListener("click", () => changeServings(-step));
@@ -369,6 +473,7 @@ function init(): void {
       }
       recompute();
       syncUrl();
+      persistState();
     });
   }
 
@@ -386,6 +491,7 @@ function init(): void {
       btn.setAttribute("aria-pressed", String(nowActive));
       recompute();
       syncUrl();
+      persistState();
     });
   });
 
@@ -452,8 +558,25 @@ function init(): void {
       } else if (target !== "kitchen" && previousView === "kitchen") {
         releaseWakeLock();
       }
+
+      persistState();
     });
   }
+
+  // -------------------------------------------------------------------
+  // Reset page — clears this recipe's saved state and reloads to defaults.
+  // A real navigation (rather than resetting every piece of in-memory state
+  // by hand) is the simplest way to guarantee a truly clean slate; dropping
+  // the query string too (via `location.pathname` rather than `location.href`)
+  // ensures a URL override (e.g. `?servings=8`) can't immediately re-apply
+  // itself after the reset.
+  // -------------------------------------------------------------------
+
+  const resetButton = document.querySelector<HTMLButtonElement>("[data-reset-page]");
+  resetButton?.addEventListener("click", () => {
+    clearStoredState();
+    location.href = location.pathname;
+  });
 
   // -------------------------------------------------------------------
   // Kitchen mode: checklist vs. one-at-a-time sub-view switcher, and

@@ -239,6 +239,7 @@ button {
 /* ---------------------------------------------------------------------- */
 
 header {
+  position: relative;
   background: var(--color-surface);
   border-radius: var(--radius);
   box-shadow: 0 6px 18px -6px var(--color-shadow);
@@ -246,6 +247,25 @@ header {
   padding: 1.5rem 1.5rem 1.25rem;
   margin: 0 auto 1.5rem;
   max-width: 46rem;
+}
+
+.reset-page-button {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.reset-page-button:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 
 :root[data-theme="dark"] header {
