@@ -53,7 +53,7 @@ steps:
     text: "Add the sherry ({{Marsala Wine}}), and enough water to cover."
     short: "Add sherry ({{Marsala Wine}}) + water to cover"
   - group: Sauce
-    time: 89
+    time: 0
     idle: true
     text: "Boil for about 30 minutes, then simmer for another hour."
 ---
