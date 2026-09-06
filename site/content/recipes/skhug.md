@@ -8,6 +8,8 @@ time: "20m"
 tags: ["yemeni", "israeli", "condiment", "vegetarian", "vegan"]
 featured_image: "/flags/ye.svg"
 servings: 1
+serving_unit: jar
+serving_step: 0.5
 ingredients:
   - name: Mild-medium fruity chillis
     quantity: 300
