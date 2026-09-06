@@ -59,6 +59,12 @@ ingredients:
     optional: true
   - name: Dry chilli
     optional: true
+substitutions:
+  - label: "Make this vegan"
+    swaps:
+      - ingredient: Ghee
+        name: Neutral oil
+        note: or vegan butter
 ---
 
 Comforting, protein-rich, ready in about 30 minutes.
