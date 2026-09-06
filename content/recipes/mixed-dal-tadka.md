@@ -53,11 +53,13 @@ ingredients:
     quantity: 0.5
     unit: tsp
   - name: Garam masala
-    quantity: 0.3
+    quantity: 0.25
     unit: tsp
   - name: Pinch of cumin powder
     optional: true
   - name: Dry chilli
+    optional: true
+  - name: Coriander
     optional: true
 substitutions:
   - label: "Make this vegan"
@@ -100,8 +102,12 @@ steps:
     short: "Combine, add remaining salt ({{Salt * 0.5}}), simmer 2 min"
   - group: Combine
     time: 0
-    text: "Turn off the heat and stir in the garam masala ({{Garam masala}}). Serve hot with rice or roti."
-    short: "Stir in garam masala ({{Garam masala}}), serve"
+    text: "Turn off the heat and stir in the garam masala ({{Garam masala}})."
+    short: "Stir in garam masala ({{Garam masala}})"
+  - group: Combine
+    time: 0
+    text: "Sprinkle with coriander and serve."
+    short: "Sprinkle with coriander and serve."
 ---
 
 Comforting, protein-rich, ready in about 50-60 minutes.
