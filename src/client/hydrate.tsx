@@ -1,0 +1,515 @@
+/**
+ * Client-side hydration for a recipe page: wires up the servings +/-
+ * buttons, unit toggle, substitution badges and steps-view switcher that
+ * `Layout.tsx` renders inert at SSR time, and reapplies Kitchen/Mise
+ * checked-state across re-renders.
+ *
+ * No-ops harmlessly on any page with no `#recipe-data` script tag (home,
+ * tag pages) — those never load this script's page from `Layout.tsx` in the
+ * first place, but this file is defensive regardless.
+ *
+ * Architecture (per the stage brief's decisions):
+ *   - `ViewState` lives purely in memory (`servings`, `unitSystem`,
+ *     `stepsView`, `activeSubstitutions`), reconstructed from what the SSR'd
+ *     DOM actually shows rather than hardcoded defaults, and only
+ *     servings/unit/substitution changes trigger a fresh `present()` call —
+ *     switching steps-view tabs is pure visibility toggling.
+ *   - Every state change re-renders full regions from scratch (ingredients +
+ *     all 4 steps-view sections) using the *same* Preact components used for
+ *     SSR (`IngredientList`, `StepsGrouped`, `StepsTimeline`, `StepsMise`,
+ *     `StepsKitchen`) via `render()` — no parallel DOM-templating.
+ *   - Kitchen/Mise checkbox "checked" state is independent client-only UI
+ *     state (not part of `ViewState`), tracked here in two `Set<string>`s
+ *     keyed by each checkbox's `data-key` and reapplied after every
+ *     steps-section re-render so it survives a servings/unit/substitution
+ *     change triggered elsewhere.
+ *   - Focus is restored after a steps-section re-render if the previously
+ *     focused element (matched by `data-key`) has a counterpart in the fresh
+ *     markup — the only focusable elements inside those four sections are
+ *     the Mise/Kitchen checkboxes.
+ */
+
+import { render, type ComponentChild } from "preact";
+import type { Recipe } from "../core/schema.js";
+import { present, type ViewState, type UnitSystem, type StepsViewMode } from "../core/present.js";
+import { IngredientList } from "../view/IngredientList.js";
+import { StepsGrouped } from "../view/StepsGrouped.js";
+import { StepsTimeline } from "../view/StepsTimeline.js";
+import { StepsMise } from "../view/StepsMise.js";
+import { StepsKitchen, type KitchenSubmode } from "../view/StepsKitchen.js";
+
+const STEPS_VIEW_MODES: StepsViewMode[] = ["grouped", "timeline", "mise", "kitchen"];
+
+function init(): void {
+  const dataScript = document.getElementById("recipe-data");
+  if (!dataScript?.textContent) return; // not a recipe page (or malformed) — nothing to hydrate
+
+  let recipe: Recipe;
+  try {
+    recipe = JSON.parse(dataScript.textContent) as Recipe;
+  } catch {
+    return; // malformed embedded data — fail harmlessly, leave the static markup as-is
+  }
+
+  const servingsSection = document.querySelector<HTMLElement>(".servings-widget");
+  const unitToggleSection = document.querySelector<HTMLElement>(".unit-toggle");
+  const substitutionsSection = document.querySelector<HTMLElement>(".substitutions");
+  const ingredientsMount = document.getElementById("ingredients-list");
+  const switcherNav = document.querySelector<HTMLElement>(".steps-view-switcher");
+
+  const stepsSections: Record<StepsViewMode, HTMLElement | null> = {
+    grouped: document.getElementById("steps-grouped"),
+    timeline: document.getElementById("steps-timeline"),
+    mise: document.getElementById("steps-mise"),
+    kitchen: document.getElementById("steps-kitchen"),
+  };
+
+  if (!servingsSection || !ingredientsMount || !switcherNav) return; // markup doesn't match the expected contract — bail defensively
+
+  // -------------------------------------------------------------------
+  // Reconstruct initial ViewState from the SSR'd DOM
+  // -------------------------------------------------------------------
+
+  const initialUnitSystem: UnitSystem = (() => {
+    const active = unitToggleSection?.querySelector<HTMLButtonElement>('[data-active="true"]');
+    const system = active?.dataset.unitSystem;
+    return system === "metric" || system === "imperial" || system === "as-written" ? system : "as-written";
+  })();
+
+  const initialStepsView: StepsViewMode = (() => {
+    for (const mode of STEPS_VIEW_MODES) {
+      const section = stepsSections[mode];
+      if (section && !section.hasAttribute("hidden")) return mode;
+    }
+    return "grouped";
+  })();
+
+  const activeSubstitutions = new Set<string>();
+  substitutionsSection?.querySelectorAll<HTMLButtonElement>('[aria-pressed="true"]').forEach((btn) => {
+    if (btn.dataset.substitution) activeSubstitutions.add(btn.dataset.substitution);
+  });
+
+  // The servings widget's base is `recipe.servings` (what `build/index.ts`
+  // used for the SSR default view state) rather than trying to re-parse the
+  // fraction-glyph-formatted `.servings-value` text back into a number.
+  const viewState: ViewState = {
+    servings: recipe.servings,
+    activeSubstitutions,
+    unitSystem: initialUnitSystem,
+    stepsView: initialStepsView,
+  };
+
+  // -------------------------------------------------------------------
+  // URL query-string override — `servings`/`units`/`sub` only (`stepsView`
+  // is explicitly not part of the URL scheme). Applied to the DOM-derived
+  // `viewState` above before anything reads it, so the first render already
+  // reflects the URL rather than flashing the SSR default first.
+  //
+  // Encoding (must stay symmetric with `syncUrl` below):
+  //   - `servings`: a finite positive number, e.g. `?servings=8`.
+  //   - `units`: exactly one of `metric`/`imperial`/`as-written`.
+  //   - `sub`: comma-separated substitution labels, e.g.
+  //     `?sub=Make+this+vegan,also+this`. Labels are joined/split on a raw
+  //     (unescaped) comma — `URLSearchParams` itself takes care of
+  //     percent-/`+`-encoding the rest of each label (spaces etc., and even
+  //     a literal comma *inside* a label, since it round-trips through
+  //     `%2C`) when the query string is built and parsed, so there's no
+  //     manual `encodeURIComponent`/`decodeURIComponent` here — doing that
+  //     on top of `URLSearchParams` would double-encode. Only labels that
+  //     match a real `recipe.substitutions[].label` are honoured; anything
+  //     else is silently dropped rather than erroring.
+  // -------------------------------------------------------------------
+
+  const validSubstitutionLabels = new Set((recipe.substitutions ?? []).map((s) => s.label));
+
+  {
+    const params = new URLSearchParams(location.search);
+
+    const servingsParam = params.get("servings");
+    if (servingsParam !== null) {
+      const parsed = Number.parseFloat(servingsParam);
+      if (Number.isFinite(parsed) && parsed > 0) viewState.servings = parsed;
+    }
+
+    const unitsParam = params.get("units");
+    if (unitsParam === "metric" || unitsParam === "imperial" || unitsParam === "as-written") {
+      viewState.unitSystem = unitsParam;
+    }
+
+    const subParam = params.get("sub");
+    if (subParam !== null) {
+      const labels = subParam.split(",").filter((label) => validSubstitutionLabels.has(label));
+      if (labels.length > 0 || subParam === "") {
+        activeSubstitutions.clear();
+        for (const label of labels) activeSubstitutions.add(label);
+      }
+    }
+  }
+
+  // Reflect the (possibly URL-overridden) initial state on the unit-toggle
+  // buttons and substitution badges before the first `recompute()` — so a
+  // page loaded with e.g. `?units=metric` doesn't show metric-converted
+  // ingredients alongside an "as-written" toggle still marked active.
+  unitToggleSection?.querySelectorAll<HTMLButtonElement>("[data-unit-system]").forEach((btn) => {
+    const isActive = btn.dataset.unitSystem === viewState.unitSystem;
+    btn.setAttribute("aria-pressed", String(isActive));
+    if (isActive) btn.setAttribute("data-active", "true");
+    else btn.removeAttribute("data-active");
+  });
+  substitutionsSection?.querySelectorAll<HTMLButtonElement>(".substitution-badge").forEach((btn) => {
+    const isActive = !!btn.dataset.substitution && activeSubstitutions.has(btn.dataset.substitution);
+    btn.setAttribute("aria-pressed", String(isActive));
+  });
+
+  // -------------------------------------------------------------------
+  // Sync ViewState -> URL, mirroring the parsing above. Called after every
+  // change to servings/unitSystem/activeSubstitutions. Uses replaceState
+  // (never pushState) so clicking controls doesn't pollute back-history.
+  // Only the `servings`/`units`/`sub` keys are touched — any other query
+  // params a future stage might add are left alone.
+  // -------------------------------------------------------------------
+
+  function syncUrl(): void {
+    const params = new URLSearchParams(location.search);
+
+    if (viewState.servings === recipe.servings) params.delete("servings");
+    else params.set("servings", String(viewState.servings));
+
+    if (viewState.unitSystem === "as-written") params.delete("units");
+    else params.set("units", viewState.unitSystem);
+
+    const subs = [...activeSubstitutions];
+    if (subs.length === 0) params.delete("sub");
+    else params.set("sub", subs.join(","));
+
+    const query = params.toString();
+    const newUrl = location.pathname + (query ? `?${query}` : "") + location.hash;
+    history.replaceState(null, "", newUrl);
+  }
+
+  // -------------------------------------------------------------------
+  // Checked-state tracking (Kitchen mode / Mise checklist) — independent of
+  // ViewState/present(), never wiped by a re-render triggered elsewhere.
+  // -------------------------------------------------------------------
+
+  const checkedKeys = {
+    mise: new Set<string>(),
+    kitchen: new Set<string>(),
+  };
+
+  // Tracks which checkbox DOM nodes already have a `change` listener attached
+  // — needed because Kitchen mode can now have *two* live checkboxes sharing
+  // one `data-key` (the checklist row and, when it's the current step, the
+  // one-at-a-time view), and because Preact's diffing can reuse an existing
+  // checkbox element across a `bindChecklist` re-run (e.g. re-rendering the
+  // Kitchen section just to flip sub-view/step, with the underlying steps
+  // unchanged) — without this guard, re-running `bindChecklist` on a reused
+  // element would stack a duplicate listener on it every time.
+  const boundBoxes = new WeakSet<HTMLInputElement>();
+
+  function bindChecklist(kind: "mise" | "kitchen"): void {
+    const container = stepsSections[kind];
+    if (!container) return;
+    const boxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-key]');
+    boxes.forEach((box) => {
+      const key = box.dataset.key ?? "";
+      box.checked = checkedKeys[kind].has(key);
+      if (boundBoxes.has(box)) return;
+      boundBoxes.add(box);
+      box.addEventListener("change", () => {
+        if (box.checked) checkedKeys[kind].add(key);
+        else checkedKeys[kind].delete(key);
+        // Kitchen mode only: a checklist row and the one-at-a-time view can
+        // both display the same step (same `data-key`) at once — keep the
+        // other instance's visual checked-state in sync immediately, rather
+        // than waiting for its next re-render, so switching sub-views never
+        // shows stale state.
+        if (kind === "kitchen") {
+          container.querySelectorAll<HTMLInputElement>(`input[type="checkbox"][data-key="${CSS.escape(key)}"]`).forEach((twin) => {
+            twin.checked = box.checked;
+          });
+        }
+      });
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // Kitchen mode sub-view state (checklist vs. one-at-a-time) — like
+  // `checkedKeys`, this is client-only UI state independent of `ViewState`:
+  // switching sub-view or stepping through the one-at-a-time view never
+  // triggers a `present()` recompute, just a re-render of the Kitchen
+  // section's own markup fed by `lastVm` (see `renderKitchenSection` below).
+  // -------------------------------------------------------------------
+
+  let kitchenSubmode: KitchenSubmode = "checklist";
+  let kitchenStepIndex = 0;
+  let lastVm: ReturnType<typeof present> | null = null;
+
+  // -------------------------------------------------------------------
+  // Rendering — reuse the exact SSR components via Preact's render().
+  //
+  // The very first `render()` call into a container establishes Preact's
+  // ownership of it (tracked per-container below); subsequent calls diff
+  // against Preact's own previous tree. Since the container's existing
+  // children on that first call are static SSR markup Preact didn't create,
+  // clear them first — otherwise `render()` would insert alongside rather
+  // than replace them.
+  // -------------------------------------------------------------------
+
+  const mounted = new WeakSet<HTMLElement>();
+
+  function mount(container: HTMLElement, vnode: ComponentChild): void {
+    if (!mounted.has(container)) {
+      container.replaceChildren();
+      mounted.add(container);
+    }
+    render(vnode, container);
+  }
+
+  function renderIngredients(vm: ReturnType<typeof present>): void {
+    mount(ingredientsMount!, <IngredientList ingredients={vm.ingredients} />);
+  }
+
+  function renderStepsSections(vm: ReturnType<typeof present>): void {
+    // Capture focus if it's currently on one of the checklist checkboxes
+    // inside a steps section, so it can be restored after the re-render.
+    const active = document.activeElement as HTMLElement | null;
+    let refocus: { containerId: string; key: string } | null = null;
+    if (active instanceof HTMLInputElement && active.dataset.key) {
+      for (const section of Object.values(stepsSections)) {
+        if (section?.contains(active)) {
+          refocus = { containerId: section.id, key: active.dataset.key };
+          break;
+        }
+      }
+    }
+
+    if (stepsSections.grouped) mount(stepsSections.grouped, <StepsGrouped vm={vm} />);
+    if (stepsSections.timeline) mount(stepsSections.timeline, <StepsTimeline vm={vm} />);
+    if (stepsSections.mise) mount(stepsSections.mise, <StepsMise vm={vm} />);
+    if (stepsSections.kitchen) {
+      mount(
+        stepsSections.kitchen,
+        <StepsKitchen vm={vm} currentIndex={kitchenStepIndex} submode={kitchenSubmode} />,
+      );
+    }
+
+    bindChecklist("mise");
+    bindChecklist("kitchen");
+
+    if (refocus) {
+      const container = document.getElementById(refocus.containerId);
+      const target = container?.querySelector<HTMLElement>(`[data-key="${CSS.escape(refocus.key)}"]`);
+      target?.focus();
+    }
+  }
+
+  // Re-renders only the Kitchen section from the last-computed view model —
+  // used by sub-view/step navigation, which never changes servings/units/
+  // substitutions and so has no reason to re-run `present()`. Kept separate
+  // from `renderStepsSections` (which re-renders *all four* steps sections
+  // and is reserved for actual `ViewState` changes).
+  function renderKitchenSection(): void {
+    if (!stepsSections.kitchen || !lastVm) return;
+    mount(
+      stepsSections.kitchen,
+      <StepsKitchen vm={lastVm} currentIndex={kitchenStepIndex} submode={kitchenSubmode} />,
+    );
+    bindChecklist("kitchen");
+  }
+
+  function recompute(): ReturnType<typeof present> {
+    const vm = present(recipe, viewState);
+    lastVm = vm;
+    renderIngredients(vm);
+    renderStepsSections(vm);
+    return vm;
+  }
+
+  // -------------------------------------------------------------------
+  // Servings +/-
+  // -------------------------------------------------------------------
+
+  const step = Number(servingsSection.dataset.step) || 1;
+  const servingsValueEl = servingsSection.querySelector<HTMLElement>(".servings-value");
+  const decreaseBtn = servingsSection.querySelector<HTMLButtonElement>('[aria-label="Decrease servings"]');
+  const increaseBtn = servingsSection.querySelector<HTMLButtonElement>('[aria-label="Increase servings"]');
+
+  function changeServings(delta: number): void {
+    const next = viewState.servings + delta;
+    // Never let servings drop to/below zero (or below one step's worth) —
+    // scale.ts divides by recipe.servings, so a non-positive target would
+    // produce a degenerate (zero/negative) scale factor.
+    viewState.servings = next < step ? step : next;
+    const vm = recompute();
+    if (servingsValueEl) servingsValueEl.textContent = `${vm.servingsDisplay} ${vm.servingUnitDisplay}`;
+    syncUrl();
+  }
+
+  decreaseBtn?.addEventListener("click", () => changeServings(-step));
+  increaseBtn?.addEventListener("click", () => changeServings(step));
+
+  // -------------------------------------------------------------------
+  // Unit toggle
+  // -------------------------------------------------------------------
+
+  const unitButtons = unitToggleSection
+    ? [...unitToggleSection.querySelectorAll<HTMLButtonElement>("[data-unit-system]")]
+    : [];
+  for (const btn of unitButtons) {
+    btn.addEventListener("click", () => {
+      const system = btn.dataset.unitSystem;
+      if (system !== "metric" && system !== "imperial" && system !== "as-written") return;
+      viewState.unitSystem = system;
+      for (const b of unitButtons) {
+        const isActive = b === btn;
+        b.setAttribute("aria-pressed", String(isActive));
+        if (isActive) b.setAttribute("data-active", "true");
+        else b.removeAttribute("data-active");
+      }
+      recompute();
+      syncUrl();
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // Substitution badges
+  // -------------------------------------------------------------------
+
+  substitutionsSection?.querySelectorAll<HTMLButtonElement>(".substitution-badge").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const label = btn.dataset.substitution;
+      if (!label) return;
+      const nowActive = !activeSubstitutions.has(label);
+      if (nowActive) activeSubstitutions.add(label);
+      else activeSubstitutions.delete(label);
+      btn.setAttribute("aria-pressed", String(nowActive));
+      recompute();
+      syncUrl();
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // Screen wake lock — held only while the user is actually looking at
+  // Kitchen mode. Feature-detected (`'wakeLock' in navigator`); every
+  // failure path (unsupported, permission denied, whatever) silently no-ops
+  // rather than surfacing anything to the user, per the stage brief.
+  //
+  // The browser itself releases a wake lock when the tab is hidden (spec
+  // behaviour, not something to fight) — `visibilitychange` re-acquires on
+  // return to a visible tab, but only if the user is still in Kitchen mode
+  // at that point (they may have switched away while the tab was hidden).
+  // -------------------------------------------------------------------
+
+  let wakeLock: WakeLockSentinel | null = null;
+
+  async function acquireWakeLock(): Promise<void> {
+    if (!("wakeLock" in navigator)) return;
+    try {
+      const sentinel = await navigator.wakeLock.request("screen");
+      wakeLock = sentinel;
+      sentinel.addEventListener("release", () => {
+        if (wakeLock === sentinel) wakeLock = null;
+      });
+    } catch {
+      wakeLock = null; // e.g. permission denied, no supporting hardware, tab not visible — never throw
+    }
+  }
+
+  function releaseWakeLock(): void {
+    const sentinel = wakeLock;
+    wakeLock = null;
+    void sentinel?.release().catch(() => {});
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && viewState.stepsView === "kitchen" && !wakeLock) {
+      void acquireWakeLock();
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // Steps-view switcher — pure visibility toggle, no present() recompute.
+  // -------------------------------------------------------------------
+
+  const switcherButtons = [...switcherNav.querySelectorAll<HTMLButtonElement>("[data-view-target]")];
+  for (const btn of switcherButtons) {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.viewTarget;
+      if (!target || !STEPS_VIEW_MODES.includes(target as StepsViewMode)) return;
+      const previousView = viewState.stepsView;
+      viewState.stepsView = target as StepsViewMode;
+      for (const mode of STEPS_VIEW_MODES) {
+        const section = stepsSections[mode];
+        if (section) section.hidden = mode !== target;
+      }
+      for (const b of switcherButtons) {
+        b.setAttribute("aria-pressed", String(b === btn));
+      }
+
+      if (target === "kitchen" && previousView !== "kitchen") {
+        void acquireWakeLock();
+      } else if (target !== "kitchen" && previousView === "kitchen") {
+        releaseWakeLock();
+      }
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // Kitchen mode: checklist vs. one-at-a-time sub-view switcher, and
+  // one-at-a-time Back/Next navigation. Both live *inside* `#steps-kitchen`,
+  // so they're re-rendered by Preact on every `renderStepsSections`/
+  // `renderKitchenSection` call — a single delegated listener on the
+  // never-replaced `#steps-kitchen` container itself (rather than binding to
+  // the inner buttons directly, which would need re-binding — and risk
+  // duplicate listeners — after every such re-render) sidesteps that
+  // entirely.
+  // -------------------------------------------------------------------
+
+  stepsSections.kitchen?.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+
+    const submodeBtn = target.closest<HTMLButtonElement>("[data-kitchen-submode-target]");
+    if (submodeBtn) {
+      const mode = submodeBtn.dataset.kitchenSubmodeTarget;
+      if (mode === "checklist" || mode === "single") {
+        kitchenSubmode = mode;
+        renderKitchenSection();
+      }
+      return;
+    }
+
+    const navBtn = target.closest<HTMLButtonElement>("[data-kitchen-step-nav]");
+    if (navBtn && !navBtn.disabled) {
+      const stepCount = lastVm?.activeSteps.length ?? 0;
+      if (navBtn.dataset.kitchenStepNav === "next" && kitchenStepIndex < stepCount - 1) kitchenStepIndex++;
+      else if (navBtn.dataset.kitchenStepNav === "back" && kitchenStepIndex > 0) kitchenStepIndex--;
+      renderKitchenSection();
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // Take over the ingredients/steps regions from Preact immediately, so
+  // later re-renders diff against Preact's own previous tree rather than
+  // fighting with the static SSR markup. Content-wise this is a no-op when
+  // there's no URL override — the reconstructed `viewState` matches what
+  // `build/index.ts` used to produce the SSR'd markup — but it establishes
+  // ownership up front and wires the initial checklist listeners via the
+  // same `bindChecklist` path subsequent re-renders use. When a `servings`
+  // override *was* applied above, the `.servings-value` text (only ever
+  // otherwise updated by `changeServings`) needs correcting too, so it
+  // doesn't keep showing the SSR default number while the ingredients below
+  // it already reflect the URL-overridden serving count.
+  // -------------------------------------------------------------------
+
+  const initialVm = recompute();
+  if (servingsValueEl) {
+    servingsValueEl.textContent = `${initialVm.servingsDisplay} ${initialVm.servingUnitDisplay}`;
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
