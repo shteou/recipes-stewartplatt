@@ -24,11 +24,11 @@ steps:
   - group: Prep
     time: 120
     text: "Salt and pepper the chicken breasts."
-    short: "Season chicken"
+    short: "Season chicken ({{Chicken breasts}})"
   - group: Prep
     time: 118
     text: "Dice the onions."
-    short: "Dice onion"
+    short: "Dice onion ({{Large onion}})"
   - group: Sear
     time: 110
     text: "Add some of the butter to a pot and brown the chicken (you may need to do this in batches)."
@@ -52,7 +52,7 @@ steps:
   - group: Sauce
     time: 90
     text: "Add the sherry, and enough water to cover."
-    short: "Add sherry + water to cover"
+    short: "Add sherry ({{Marsala Wine}}) + water to cover"
   - group: Sauce
     time: 89
     idle: true

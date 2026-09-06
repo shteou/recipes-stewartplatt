@@ -69,11 +69,11 @@ steps:
   - group: Lentils
     time: 60
     text: "Rinse the chana dal and mung dal together under cold water until it runs mostly clear."
-    short: "Rinse chana + mung dal"
+    short: "Rinse chana ({{Chana dal}}) + mung ({{Mung dal}}) dal"
   - group: Lentils
     time: 55
     text: "Add the rinsed dal to a pot with the water, turmeric powder, bay leaf, and half of the salt. Bring to a boil, then reduce heat and simmer, partially covered, until soft and starting to break down."
-    short: "Boil with water, turmeric, bay leaf, ½ salt"
+    short: "Boil with water ({{Water}}), turmeric ({{Turmeric powder}}), bay leaf, salt ({{Salt * 0.5}})"
   - group: Lentils
     time: 20
     idle: true
@@ -85,23 +85,23 @@ steps:
   - group: Tadka
     time: 15
     text: "In a small pan, heat the ghee over medium heat. Add the cumin seeds and let them sizzle for a few seconds, then add the curry leaves and let them crackle."
-    short: "Bloom cumin + curry leaves in ghee"
+    short: "Bloom cumin ({{Cumin seeds}}) + curry leaves ({{Curry leaves}}) in ghee ({{Ghee}})"
   - group: Tadka
     time: 10
     text: "Add the garlic and onion. Sauté until the onion turns golden."
-    short: "Sauté garlic + onion till golden"
+    short: "Sauté garlic ({{Garlic cloves}}) + onion ({{Onion}}) till golden"
   - group: Tadka
     time: 5
     text: "Add the tomato, coriander powder, and red chili powder. Cook until the tomatoes soften and the oil starts to separate."
-    short: "Add tomato + spices, cook till oil separates"
+    short: "Add tomato ({{Tomato}}) + coriander ({{Coriander powder}}) + chili powder ({{Red chili powder}}), cook till oil separates"
   - group: Combine
     time: 2
     text: "Pour the tempering into the cooked dal. Add the remaining salt to taste, and stir well. Simmer everything together for a couple minutes to let the flavors meld."
-    short: "Combine, add rest of salt, simmer 2 min"
+    short: "Combine, add remaining salt ({{Salt * 0.5}}), simmer 2 min"
   - group: Combine
     time: 0
     text: "Turn off the heat and stir in the garam masala. Serve hot with rice or roti."
-    short: "Stir in garam masala, serve"
+    short: "Stir in garam masala ({{Garam masala}}), serve"
 ---
 
 Comforting, protein-rich, ready in about 50-60 minutes.

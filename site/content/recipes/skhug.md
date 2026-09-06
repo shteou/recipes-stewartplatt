@@ -34,15 +34,15 @@ steps:
   - group: Prep
     time: 20
     text: "Roughly chop the chillis, deseeding first if you want less heat."
-    short: "Chop chillis"
+    short: "Chop chillis ({{Mild-medium fruity chillis}})"
   - group: Prep
     time: 18
     text: "Peel the garlic cloves."
-    short: "Peel garlic"
+    short: "Peel garlic ({{Garlic cloves}})"
   - group: Prep
     time: 16
     text: "Roughly chop the coriander."
-    short: "Chop coriander"
+    short: "Chop coriander ({{Coriander}})"
   - group: Prep
     time: 14
     text: "Dice the tomato and/or pepper, if using."
@@ -54,7 +54,7 @@ steps:
   - group: Blend
     time: 6
     text: "Add the cumin and the juice of the lime."
-    short: "Add cumin + lime juice"
+    short: "Add cumin ({{Cumin}}) + lime juice ({{Lime}})"
   - group: Blend
     time: 3
     text: "Add salt and pepper to taste."
