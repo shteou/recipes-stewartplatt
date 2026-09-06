@@ -5,7 +5,7 @@ summary: "Chana dal and mung dal simmered with bay leaf, finished with a cumin-c
 date: 2026-09-05
 draft: false
 time: "30m"
-tags: ["indian", "vegetarian", "lentils"]
+tags: ["indian", "vegetarian", "vegan", "lentils"]
 featured_image: "/flags/in.svg"
 servings: 4
 ingredients:
