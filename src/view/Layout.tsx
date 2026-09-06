@@ -17,6 +17,7 @@ import { StepsTimeline } from "./StepsTimeline.js";
 import { StepsMise } from "./StepsMise.js";
 import { StepsKitchen } from "./StepsKitchen.js";
 import { HeadAssets, SiteBar, ThemeToggleScript } from "./SiteChrome.js";
+import { hydrateScriptPath } from "../../build/assets.js";
 
 export interface RecipePageProps {
   vm: RecipeViewModel;
@@ -171,7 +172,7 @@ export function RecipePage({ vm, recipe, featuredImageSrc }: RecipePageProps) {
           id="recipe-data"
           dangerouslySetInnerHTML={{ __html: embedJson(recipe) }}
         />
-        <script type="module" src="/client/hydrate.js"></script>
+        <script type="module" src={hydrateScriptPath()}></script>
         <ThemeToggleScript />
       </body>
     </html>

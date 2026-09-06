@@ -22,7 +22,15 @@
  * Fixed from the old Hugo-era site: the toggle is a real <button> with
  * `aria-pressed` (not an `<a href="#" role="button">`), paired with a
  * visually-hidden accessible label alongside the sun/moon emoji.
+ *
+ * The stylesheet/script URLs below are resolved via `build/assets.ts` rather
+ * than hardcoded: every deployed asset path is content-hashed, so a deploy
+ * that actually changes `theme.css`/`theme-toggle.ts` always ships under a
+ * new URL (see `assets.ts`'s docstring for why — cache-busting, so a stale
+ * cached bundle can't masquerade as a real bug).
  */
+
+import { themeStylesheetPath, themeToggleScriptPath } from "../../build/assets.js";
 
 /**
  * The one deliberate exception to "no inline scripts" (DESIGN.md §5.1):
@@ -43,7 +51,7 @@ export function HeadAssets() {
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-      <link rel="stylesheet" href="/styles/theme.css" />
+      <link rel="stylesheet" href={themeStylesheetPath()} />
     </>
   );
 }
@@ -69,5 +77,5 @@ export function SiteBar() {
 }
 
 export function ThemeToggleScript() {
-  return <script type="module" src="/client/theme-toggle.js"></script>;
+  return <script type="module" src={themeToggleScriptPath()}></script>;
 }

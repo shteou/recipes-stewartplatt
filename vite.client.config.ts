@@ -28,13 +28,19 @@ export default defineConfig({
   build: {
     outDir: "public/client",
     emptyOutDir: true,
+    // Emits public/client/.vite/manifest.json mapping each entry to its
+    // actual hashed output filename — read by build/assets.ts so
+    // SiteChrome.tsx/Layout.tsx never hardcode a stale asset URL. See
+    // build/assets.ts's docstring for why this file's filenames must be
+    // content-hashed at all (cache-busting on every deploy).
+    manifest: true,
     rollupOptions: {
       input: {
         hydrate: resolve(import.meta.dirname, "src/client/hydrate.tsx"),
         "theme-toggle": resolve(import.meta.dirname, "src/client/theme-toggle.ts"),
       },
       output: {
-        entryFileNames: "[name].js",
+        entryFileNames: "[name]-[hash].js",
         format: "es",
       },
     },

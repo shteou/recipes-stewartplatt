@@ -25,12 +25,14 @@ import { TAXONOMY } from "../src/core/taxonomy.js";
 import { RecipePage } from "../src/view/Layout.js";
 import { HomePage } from "../src/view/HomePage.js";
 import { TagPage } from "../src/view/TagPage.js";
+import { themeStylesheetPath } from "./assets.js";
 
 const ROOT = join(import.meta.dirname, "..");
 const CONTENT_DIR = join(ROOT, "content", "recipes");
 const ASSETS_DIR = join(ROOT, "assets");
 const STYLES_DIR = join(ROOT, "src", "styles");
 const PUBLIC_DIR = join(ROOT, "public");
+const HEADERS_SRC_FILE = join(ROOT, "build", "_headers");
 
 const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
@@ -85,17 +87,36 @@ function loadAllRecipes(): Recipe[] {
 // Styles
 // ---------------------------------------------------------------------------
 
-/** Copy every stylesheet in src/styles/ into public/styles/, so every generated page's `<link rel="stylesheet" href="/styles/...">` resolves. */
+/**
+ * Copy theme.css into public/styles/ under its content-hashed name (see
+ * `assets.ts`'s `themeStylesheetPath`), so every generated page's
+ * `<link rel="stylesheet">` (rendered via that same function in
+ * `SiteChrome.tsx`) resolves to the file this actually writes. Only
+ * `theme.css` exists today — if a second stylesheet is ever added, this (and
+ * `themeStylesheetPath`) need generalizing beyond a single hardcoded file.
+ */
 function copyStyles(): void {
   const destDir = join(PUBLIC_DIR, "styles");
   mkdirSync(destDir, { recursive: true });
-  for (const filename of readdirSync(STYLES_DIR)) {
-    if (!filename.endsWith(".css")) continue; // skips .gitkeep
-    const srcFile = join(STYLES_DIR, filename);
-    const destFile = join(destDir, filename);
-    copyFileSync(srcFile, destFile);
-    console.log(`copied ${srcFile} -> ${destFile}`);
-  }
+  const srcFile = join(STYLES_DIR, "theme.css");
+  const hashedFilename = themeStylesheetPath().replace(/^\/styles\//, "");
+  const destFile = join(destDir, hashedFilename);
+  copyFileSync(srcFile, destFile);
+  console.log(`copied ${srcFile} -> ${destFile}`);
+}
+
+/**
+ * Copy the static Cache-Control rules (build/_headers) into public/_headers
+ * — Cloudflare Pages reads a `_headers` file at the root of the deployed
+ * output directory verbatim. Kept as a source file under `build/` (rather
+ * than written by hand into `public/`, which is entirely gitignored/
+ * regenerated) so it's version-controlled like everything else this build
+ * copies in.
+ */
+function copyHeaders(): void {
+  const destFile = join(PUBLIC_DIR, "_headers");
+  copyFileSync(HEADERS_SRC_FILE, destFile);
+  console.log(`copied ${HEADERS_SRC_FILE} -> ${destFile}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,6 +205,7 @@ function buildTagPages(recipes: Recipe[]): void {
 // ---------------------------------------------------------------------------
 
 copyStyles();
+copyHeaders();
 const recipes = loadAllRecipes();
 for (const recipe of recipes) buildRecipePage(recipe);
 buildHomePage(recipes);
