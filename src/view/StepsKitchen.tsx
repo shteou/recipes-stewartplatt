@@ -41,11 +41,22 @@
  * `idle` step that has a prepared timer (absent from the map entirely means
  * no derivable duration for that step — see `TimerCard` below). Timers
  * require an explicit manual start — a `"not-started"` timer renders its
- * full duration alongside a Start button rather than counting down on its
+ * full duration alongside a Play button rather than counting down on its
  * own. See `hydrate.tsx`'s `prepareIdleTimers`/`toTimerState` for the actual
  * timer state machine, which tracks *every* idle step at once (not just the
  * currently-displayed one) precisely so the checklist can show them all
  * simultaneously.
+ *
+ * `TimerCard` renders one Play/Stop toggle (▶ starts or resumes from the
+ * current remaining time; ■, shown only while running, stops and resets —
+ * identical to the dedicated Reset button below, just reachable without
+ * leaving the running state), a Pause button (only while running — freezes
+ * the remaining time so the toggle resumes from the same point rather than
+ * restarting), a Reset button (always present once the timer has been
+ * touched — stops and restores the original duration), and −/+ buttons
+ * flanking the display that nudge the remaining time by a minute (held down,
+ * they repeat at an accelerating rate — see `hydrate.tsx`'s
+ * `startTimerAdjustHold`).
  *
  * The inline `<style>` block below is this stage's *explicit, narrow*
  * exception to "no CSS yet" (that's Stage 10's job): Kitchen-mode-only
@@ -62,6 +73,8 @@
  * explicitly for the requested element.
  */
 
+import { faMinus, faPause, faPlay, faPlus, faRotateRight, faStop } from "@fortawesome/free-solid-svg-icons";
+import type { IconDefinition } from "@fortawesome/fontawesome-common-types";
 import type { RecipeViewModel, ResolvedStep } from "../core/present.js";
 
 export type KitchenSubmode = "checklist" | "single";
@@ -72,8 +85,8 @@ export interface KitchenTimerState {
   stepIndex: number;
   remainingMs: number;
   durationMs: number;
-  /** "not-started": prepared but awaiting a manual Start; timers never count down on their own. */
-  status: "not-started" | "running" | "finished";
+  /** "not-started": prepared but awaiting a manual Start; timers never count down on their own. "paused": was running, frozen mid-countdown by the Pause button. */
+  status: "not-started" | "running" | "paused" | "finished";
 }
 
 export interface StepsKitchenProps {
@@ -140,20 +153,60 @@ const KITCHEN_MODE_STYLES = `
   font-size: 1.15rem;
   font-weight: bold;
 }
+.steps-kitchen-timer-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+  margin: 0.5rem 0;
+}
 .steps-kitchen-timer-display {
-  font-size: 2.5rem;
+  font-size: 1.75rem;
   font-weight: bold;
   font-variant-numeric: tabular-nums;
-  margin: 0.5rem 0;
+  text-align: center;
+  white-space: nowrap;
 }
 .steps-kitchen-timer-status {
   font-size: 1.1rem;
   margin: 0 0 0.5rem;
 }
 .steps-kitchen-timer-card button {
-  font-size: 0.95rem;
-  padding: 0.4rem 0.85rem;
-  min-height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  flex-shrink: 0;
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+}
+.steps-kitchen-timer-card button:hover {
+  background: var(--color-accent-hover);
+}
+.steps-kitchen-timer-card button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.steps-kitchen-timer-icon {
+  width: 0.9em;
+  height: 0.9em;
+}
+/* Rectangular rather than round — a plain circle costs more width than a
+   +/- glyph needs, and these two sit right against the display far more
+   often than the transport buttons below get pressed in sequence. */
+.steps-kitchen-timer-adjust {
+  border-radius: var(--radius);
+  padding: 0.35rem 0.55rem;
+  font-size: 0.9rem;
+}
+.steps-kitchen-timer-transport {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  font-size: 1rem;
+  margin: 0 2px;
 }
 #steps-kitchen:fullscreen {
   background: var(--color-ground);
@@ -164,26 +217,76 @@ const KITCHEN_MODE_STYLES = `
 }
 `;
 
+/**
+ * Renders a Font Awesome Free icon (`@fortawesome/free-solid-svg-icons`,
+ * CC BY 4.0 — see that package's LICENSE.txt) as inline SVG straight from
+ * its bundled path data, rather than pulling in the webfont/CDN runtime:
+ * no extra network request, and it renders identically through SSR and
+ * client-side hydration since it's just markup.
+ */
+function Icon({ icon }: { icon: IconDefinition }) {
+  const [width, height, , , pathData] = icon.icon;
+  return (
+    <svg class="steps-kitchen-timer-icon" viewBox={`0 0 ${width} ${height}`} aria-hidden="true" focusable="false">
+      <path fill="currentColor" d={pathData as string} />
+    </svg>
+  );
+}
+
 /** Shared idle-step rendering for both sub-views: a step's terse text plus its timer (or a "no timer" fallback), driven entirely by the `timer` snapshot handed down from `hydrate.tsx`. */
 function TimerCard({ step, timer }: { step: ResolvedStep; timer: KitchenTimerState | null }) {
   return (
     <div data-accent={step.accent} class="steps-kitchen-timer-card">
       <p class="steps-kitchen-timer-status">{step.short ?? step.text}</p>
       {timer ? (
-        <>
+        <div class="steps-kitchen-timer-row">
+          <button
+            type="button"
+            class="steps-kitchen-timer-adjust"
+            data-kitchen-timer-minus={timer.stepIndex}
+            aria-label="Subtract one minute"
+          >
+            <Icon icon={faMinus} />
+          </button>
           <p class="steps-kitchen-timer-display" aria-live="polite">
             {timer.status === "finished" ? "Time's up!" : formatTimer(timer.remainingMs)}
           </p>
-          {timer.status === "not-started" ? (
-            <button type="button" data-kitchen-timer-start={timer.stepIndex}>
-              Start timer
-            </button>
-          ) : (
-            <button type="button" data-kitchen-timer-restart={timer.stepIndex}>
-              Restart timer
+          <button
+            type="button"
+            class="steps-kitchen-timer-adjust"
+            data-kitchen-timer-plus={timer.stepIndex}
+            aria-label="Add one minute"
+          >
+            <Icon icon={faPlus} />
+          </button>
+          <button
+            type="button"
+            class="steps-kitchen-timer-transport"
+            data-kitchen-timer-playstop={timer.stepIndex}
+            aria-label={timer.status === "running" ? "Stop timer" : "Start timer"}
+          >
+            <Icon icon={timer.status === "running" ? faStop : faPlay} />
+          </button>
+          {timer.status === "running" && (
+            <button
+              type="button"
+              class="steps-kitchen-timer-transport"
+              data-kitchen-timer-pause={timer.stepIndex}
+              aria-label="Pause timer"
+            >
+              <Icon icon={faPause} />
             </button>
           )}
-        </>
+          <button
+            type="button"
+            class="steps-kitchen-timer-transport"
+            data-kitchen-timer-reset={timer.stepIndex}
+            aria-label="Reset timer"
+            disabled={timer.status === "not-started"}
+          >
+            <Icon icon={faRotateRight} />
+          </button>
+        </div>
       ) : (
         <p class="steps-kitchen-timer-status">No timer available for this wait — carry on when ready.</p>
       )}

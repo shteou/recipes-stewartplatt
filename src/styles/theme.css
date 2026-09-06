@@ -516,6 +516,14 @@ li.substituted {
   margin: 0 auto;
 }
 
+/* Trims the browser's default <ol> indent (40px) down to match the rest of
+   this stylesheet's list indents (`.step-group ol`, `.mise-method`) — more
+   important here than elsewhere since Kitchen mode targets narrow phone
+   screens, where that default eats a chunk of the available width. */
+.steps-kitchen-checklist {
+  padding-left: 1.25rem;
+}
+
 /* -- Grouped -- */
 
 .step-group {

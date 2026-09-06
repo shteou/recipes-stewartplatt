@@ -394,24 +394,31 @@ function init(): void {
   // once, each independently startable, so the state needs to support
   // several timers running concurrently.
   //
-  // Each entry uses a wall-clock `startedAt` timestamp + fixed `durationMs`,
-  // with remaining time always recomputed from `Date.now()` (never a
-  // decrementing tick counter), so an interval throttled or entirely paused
-  // by a backgrounded tab still reports the correct remaining time the
-  // moment it's checked again — exactly the same reasoning as this file's
-  // wake-lock handling below.
+  // Each entry uses a wall-clock `endAt` timestamp (the moment the countdown
+  // would reach zero) while running, with remaining time always recomputed
+  // from `Date.now()` (never a decrementing tick counter), so an interval
+  // throttled or entirely paused by a backgrounded tab still reports the
+  // correct remaining time the moment it's checked again — exactly the same
+  // reasoning as this file's wake-lock handling below. While not running
+  // (not-started/paused/finished), `remainingMs` itself is authoritative.
   //
   // Timers require an explicit manual start: `prepareIdleTimers` only ever
-  // creates a *not-started* entry (`startedAt: null`) showing its full
-  // duration — it never starts counting down on its own. Ticking begins only
-  // from the `data-kitchen-timer-start` click handler below.
+  // creates a *not-started* entry (`endAt: null`, `remainingMs: durationMs`)
+  // showing its full duration — it never starts counting down on its own.
+  // Ticking begins only from the `data-kitchen-timer-playstop` click handler
+  // below.
   // -------------------------------------------------------------------
 
   interface KitchenTimer {
     stepIndex: number;
-    /** `null` until the user explicitly presses Start. */
-    startedAt: number | null;
+    /** Fixed, recipe-derived duration — never mutated; Reset restores `remainingMs` to this. */
     durationMs: number;
+    /** Authoritative remaining time while not running (not-started/paused/finished). */
+    remainingMs: number;
+    /** `Date.now() + remainingMs` at the moment Play was last pressed; `null` while not running. */
+    endAt: number | null;
+    /** `false` only in the untouched not-started state; set on first Play, cleared by Reset. Distinguishes "paused" from "not-started" even if `remainingMs` happens to equal `durationMs`. */
+    hasStarted: boolean;
     finished: boolean;
   }
 
@@ -440,7 +447,8 @@ function init(): void {
       if (!step.idle || kitchenTimers.has(index)) return;
       const durationMinutes = idleDurationMinutes(vm, index);
       if (durationMinutes > 0) {
-        kitchenTimers.set(index, { stepIndex: index, startedAt: null, durationMs: durationMinutes * 60_000, finished: false });
+        const durationMs = durationMinutes * 60_000;
+        kitchenTimers.set(index, { stepIndex: index, durationMs, remainingMs: durationMs, endAt: null, hasStarted: false, finished: false });
       }
     });
   }
@@ -496,10 +504,12 @@ function init(): void {
     kitchenTimerIntervalId = window.setInterval(() => {
       let anyRunning = false;
       for (const t of kitchenTimers.values()) {
-        if (t.startedAt === null || t.finished) continue;
-        const remaining = t.durationMs - (Date.now() - t.startedAt);
+        if (t.endAt === null || t.finished) continue;
+        const remaining = t.endAt - Date.now();
         if (remaining <= 0) {
           t.finished = true;
+          t.remainingMs = 0;
+          t.endAt = null;
           playTimerAlert();
         } else {
           anyRunning = true;
@@ -512,12 +522,54 @@ function init(): void {
 
   /** Projects one `KitchenTimer`'s current, `Date.now()`-relative state for rendering. */
   function toTimerState(t: KitchenTimer): KitchenTimerState {
-    if (t.startedAt === null) {
-      return { stepIndex: t.stepIndex, remainingMs: t.durationMs, durationMs: t.durationMs, status: "not-started" };
+    if (t.endAt !== null) {
+      const remainingMs = Math.max(0, t.endAt - Date.now());
+      return {
+        stepIndex: t.stepIndex,
+        remainingMs,
+        durationMs: t.durationMs,
+        status: t.finished || remainingMs <= 0 ? "finished" : "running",
+      };
     }
-    const remainingMs = Math.max(0, t.durationMs - (Date.now() - t.startedAt));
-    const finished = t.finished || remainingMs <= 0;
-    return { stepIndex: t.stepIndex, remainingMs, durationMs: t.durationMs, status: finished ? "finished" : "running" };
+    const status = t.finished ? "finished" : t.hasStarted ? "paused" : "not-started";
+    return { stepIndex: t.stepIndex, remainingMs: t.remainingMs, durationMs: t.durationMs, status };
+  }
+
+  /** Starts (or resumes, from `remainingMs`) a timer's countdown. A finished timer restarts from the full original duration. */
+  function startOrResumeTimer(t: KitchenTimer): void {
+    if (t.finished) {
+      t.remainingMs = t.durationMs;
+      t.finished = false;
+    }
+    t.hasStarted = true;
+    t.endAt = Date.now() + t.remainingMs;
+    requestNotificationPermissionIfUnasked();
+    startKitchenTimerTicking();
+  }
+
+  /** Freezes a running timer's remaining time in place, so the next Play resumes from the same point rather than restarting. No-op when not running. */
+  function pauseTimer(t: KitchenTimer): void {
+    if (t.endAt === null) return;
+    t.remainingMs = Math.max(0, t.endAt - Date.now());
+    t.endAt = null;
+  }
+
+  /** Stops (if running) and restores the original duration — shared by the Play/Stop toggle's Stop action and the dedicated Reset button. */
+  function resetTimer(t: KitchenTimer): void {
+    t.remainingMs = t.durationMs;
+    t.endAt = null;
+    t.hasStarted = false;
+    t.finished = false;
+  }
+
+  /** Nudges the remaining time by `deltaMs` (positive or negative), live if running. Un-finishes a finished timer once its remaining time is back above zero. */
+  function adjustTimer(t: KitchenTimer, deltaMs: number): void {
+    if (t.endAt !== null) {
+      t.endAt = Math.max(Date.now(), t.endAt + deltaMs);
+    } else {
+      t.remainingMs = Math.max(0, t.remainingMs + deltaMs);
+      if (t.remainingMs > 0) t.finished = false;
+    }
   }
 
   /** Builds the `timers` prop for `StepsKitchen` — every prepared idle timer, keyed by `vm.steps` index. */
@@ -545,7 +597,7 @@ function init(): void {
   // entirely, to avoid ticking somewhere with nothing visible to update).
   function resumeKitchenTimerTickingIfAnyRunning(): void {
     for (const t of kitchenTimers.values()) {
-      if (t.startedAt !== null && !t.finished) {
+      if (t.endAt !== null && !t.finished) {
         startKitchenTimerTicking();
         return;
       }
@@ -844,6 +896,78 @@ function init(): void {
   });
 
   // -------------------------------------------------------------------
+  // Kitchen mode timer −/+ long-press: holding either button repeats the
+  // one-minute adjustment at an accelerating rate, from one every
+  // `TIMER_ADJUST_INITIAL_DELAY_MS` up to one every `TIMER_ADJUST_MIN_INTERVAL_MS`
+  // (5/second) as the hold approaches `TIMER_ADJUST_RAMP_MS` (10s), then holds
+  // at that fastest rate. Driven by Pointer Events (mouse, touch and pen
+  // alike) rather than the click delegation above, since a hold needs to act
+  // *while* the button is down, not only once it's released — `pointerup`/
+  // `pointercancel` are bound to `window` rather than the button itself so a
+  // still-held pointer keeps repeating even through the re-renders the
+  // adjustments themselves trigger (which replace the button element).
+  // -------------------------------------------------------------------
+
+  const TIMER_ADJUST_INITIAL_DELAY_MS = 500;
+  const TIMER_ADJUST_MIN_INTERVAL_MS = 200;
+  const TIMER_ADJUST_RAMP_MS = 10_000;
+
+  let timerAdjustHoldTimeoutId: number | null = null;
+  let timerAdjustHoldStart = 0;
+  let timerAdjustHoldTarget: { stepIndex: number; deltaMs: number } | null = null;
+  // Set once a hold has applied at least one repeat, so the click delegation
+  // above can skip the extra click a press-and-hold still fires on release.
+  let timerAdjustHoldFired = false;
+
+  function applyTimerAdjust(stepIndex: number, deltaMs: number): void {
+    const t = kitchenTimers.get(stepIndex);
+    if (t) adjustTimer(t, deltaMs);
+    renderKitchenSection();
+  }
+
+  function stopTimerAdjustHold(): void {
+    if (timerAdjustHoldTimeoutId !== null) {
+      window.clearTimeout(timerAdjustHoldTimeoutId);
+      timerAdjustHoldTimeoutId = null;
+    }
+    timerAdjustHoldTarget = null;
+  }
+
+  function scheduleNextTimerAdjustRepeat(): void {
+    if (!timerAdjustHoldTarget) return;
+    const { stepIndex, deltaMs } = timerAdjustHoldTarget;
+    const rampProgress = Math.min(1, (Date.now() - timerAdjustHoldStart) / TIMER_ADJUST_RAMP_MS);
+    const interval =
+      TIMER_ADJUST_INITIAL_DELAY_MS - rampProgress * (TIMER_ADJUST_INITIAL_DELAY_MS - TIMER_ADJUST_MIN_INTERVAL_MS);
+    timerAdjustHoldTimeoutId = window.setTimeout(() => {
+      timerAdjustHoldFired = true;
+      applyTimerAdjust(stepIndex, deltaMs);
+      scheduleNextTimerAdjustRepeat();
+    }, interval);
+  }
+
+  function startTimerAdjustHold(stepIndex: number, deltaMs: number): void {
+    stopTimerAdjustHold();
+    timerAdjustHoldStart = Date.now();
+    timerAdjustHoldTarget = { stepIndex, deltaMs };
+    timerAdjustHoldTimeoutId = window.setTimeout(() => {
+      timerAdjustHoldFired = true;
+      applyTimerAdjust(stepIndex, deltaMs);
+      scheduleNextTimerAdjustRepeat();
+    }, TIMER_ADJUST_INITIAL_DELAY_MS);
+  }
+
+  stepsSections.kitchen?.addEventListener("pointerdown", (event) => {
+    const target = event.target as HTMLElement;
+    const minusBtn = target.closest<HTMLButtonElement>("[data-kitchen-timer-minus]");
+    const plusBtn = target.closest<HTMLButtonElement>("[data-kitchen-timer-plus]");
+    if (minusBtn) startTimerAdjustHold(Number(minusBtn.dataset.kitchenTimerMinus), -60_000);
+    else if (plusBtn) startTimerAdjustHold(Number(plusBtn.dataset.kitchenTimerPlus), 60_000);
+  });
+  window.addEventListener("pointerup", stopTimerAdjustHold);
+  window.addEventListener("pointercancel", stopTimerAdjustHold);
+
+  // -------------------------------------------------------------------
   // Kitchen mode: checklist vs. one-at-a-time sub-view switcher, and
   // one-at-a-time Back/Next navigation. Both live *inside* `#steps-kitchen`,
   // so they're re-rendered by Preact on every `renderStepsSections`/
@@ -875,32 +999,56 @@ function init(): void {
       return;
     }
 
-    // Both timer buttons carry the step index they belong to directly (rather
+    // All timer buttons carry the step index they belong to directly (rather
     // than assuming `kitchenStepIndex`, the one-at-a-time view's "current"
     // step) — the checklist can show several idle steps' timer cards at once,
-    // each independently startable.
-    const startBtn = target.closest<HTMLButtonElement>("[data-kitchen-timer-start]");
-    if (startBtn) {
-      const t = kitchenTimers.get(Number(startBtn.dataset.kitchenTimerStart));
-      if (t && t.startedAt === null) {
-        t.startedAt = Date.now();
-        requestNotificationPermissionIfUnasked();
-        startKitchenTimerTicking();
+    // each independently controllable.
+    const playStopBtn = target.closest<HTMLButtonElement>("[data-kitchen-timer-playstop]");
+    if (playStopBtn) {
+      const t = kitchenTimers.get(Number(playStopBtn.dataset.kitchenTimerPlaystop));
+      if (t) {
+        // The toggle's Stop (shown only while running) is the same
+        // stop-and-restore-original-time action as the dedicated Reset
+        // button below — just reachable without leaving the running state.
+        if (t.endAt !== null) resetTimer(t);
+        else startOrResumeTimer(t);
       }
       renderKitchenSection();
       return;
     }
 
-    const restartBtn = target.closest<HTMLButtonElement>("[data-kitchen-timer-restart]");
-    if (restartBtn) {
-      const t = kitchenTimers.get(Number(restartBtn.dataset.kitchenTimerRestart));
-      if (t) {
-        t.startedAt = Date.now();
-        t.finished = false;
-        requestNotificationPermissionIfUnasked();
-        startKitchenTimerTicking();
-      }
+    const pauseBtn = target.closest<HTMLButtonElement>("[data-kitchen-timer-pause]");
+    if (pauseBtn) {
+      const t = kitchenTimers.get(Number(pauseBtn.dataset.kitchenTimerPause));
+      if (t) pauseTimer(t);
       renderKitchenSection();
+      return;
+    }
+
+    const resetBtn = target.closest<HTMLButtonElement>("[data-kitchen-timer-reset]");
+    if (resetBtn) {
+      const t = kitchenTimers.get(Number(resetBtn.dataset.kitchenTimerReset));
+      if (t) resetTimer(t);
+      renderKitchenSection();
+      return;
+    }
+
+    // A plain click/tap always nudges by exactly one minute; a long-press
+    // repeats via `startTimerAdjustHold` below instead, which flags
+    // `timerAdjustHoldFired` once it has already applied at least one
+    // adjustment — suppressing the trailing click a press-and-hold still
+    // fires on release, so a hold never double-counts its last step.
+    const minusBtn = target.closest<HTMLButtonElement>("[data-kitchen-timer-minus]");
+    if (minusBtn) {
+      if (!timerAdjustHoldFired) applyTimerAdjust(Number(minusBtn.dataset.kitchenTimerMinus), -60_000);
+      timerAdjustHoldFired = false;
+      return;
+    }
+
+    const plusBtn = target.closest<HTMLButtonElement>("[data-kitchen-timer-plus]");
+    if (plusBtn) {
+      if (!timerAdjustHoldFired) applyTimerAdjust(Number(plusBtn.dataset.kitchenTimerPlus), 60_000);
+      timerAdjustHoldFired = false;
       return;
     }
 
