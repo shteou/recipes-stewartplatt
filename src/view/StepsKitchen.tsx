@@ -126,11 +126,12 @@ const KITCHEN_MODE_STYLES = `
   accent-color: var(--color-accent);
   flex-shrink: 0;
 }
-.kitchen-submode-switcher {
+.kitchen-toolbar {
   margin: 0 0 1rem;
 }
 .kitchen-submode-switcher button,
-.steps-kitchen-nav button {
+.steps-kitchen-nav button,
+.steps-kitchen-fullscreen-toggle button {
   font-size: 0.95rem;
   padding: 0.4rem 0.85rem;
   min-height: 2rem;
@@ -153,9 +154,6 @@ const KITCHEN_MODE_STYLES = `
   font-size: 0.95rem;
   padding: 0.4rem 0.85rem;
   min-height: 2rem;
-}
-.steps-kitchen-fullscreen-toggle {
-  margin: 0 0 1rem;
 }
 #steps-kitchen:fullscreen {
   background: var(--color-ground);
@@ -215,22 +213,24 @@ export function StepsKitchen({
     <>
       <style dangerouslySetInnerHTML={{ __html: KITCHEN_MODE_STYLES }} />
 
-      {fullscreenSupported && (
-        <nav aria-label="Kitchen mode full-screen toggle" class="steps-kitchen-fullscreen-toggle">
-          <button type="button" data-kitchen-fullscreen-toggle aria-pressed={isFullscreen}>
-            {isFullscreen ? "Exit full screen" : "Full screen"}
+      <div class="kitchen-toolbar">
+        <nav aria-label="Kitchen mode sub-view switcher" class="kitchen-submode-switcher">
+          <button type="button" data-kitchen-submode-target="checklist" aria-pressed={submode === "checklist"}>
+            Checklist
+          </button>
+          <button type="button" data-kitchen-submode-target="single" aria-pressed={submode === "single"}>
+            One at a time
           </button>
         </nav>
-      )}
 
-      <nav aria-label="Kitchen mode sub-view switcher" class="kitchen-submode-switcher">
-        <button type="button" data-kitchen-submode-target="checklist" aria-pressed={submode === "checklist"}>
-          Checklist
-        </button>
-        <button type="button" data-kitchen-submode-target="single" aria-pressed={submode === "single"}>
-          One at a time
-        </button>
-      </nav>
+        {fullscreenSupported && (
+          <nav aria-label="Kitchen mode full-screen toggle" class="steps-kitchen-fullscreen-toggle">
+            <button type="button" data-kitchen-fullscreen-toggle aria-pressed={isFullscreen}>
+              {isFullscreen ? "Exit full screen" : "Full screen"}
+            </button>
+          </nav>
+        )}
+      </div>
 
       <ol class="steps-kitchen-checklist" data-kitchen-submode="checklist" hidden={submode !== "checklist"}>
         {steps.map((step, index) =>

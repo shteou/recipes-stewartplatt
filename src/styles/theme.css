@@ -671,6 +671,14 @@ li.substituted {
   font-variant-numeric: tabular-nums;
 }
 
+.kitchen-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .kitchen-submode-switcher,
 .steps-kitchen-nav {
   display: flex;
@@ -690,6 +698,22 @@ li.substituted {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-accent-contrast);
+}
+
+/* Deliberately the secondary brand colour, not the accent used by every
+   other pressed/active button above — this toggle isn't a "which view is
+   active" choice like the others, so it's styled to stand apart from them. */
+.steps-kitchen-fullscreen-toggle button {
+  border: 1px solid var(--color-secondary);
+  background: var(--color-surface);
+  color: var(--color-secondary);
+  border-radius: var(--radius);
+}
+
+.steps-kitchen-fullscreen-toggle button[aria-pressed="true"] {
+  background: var(--color-secondary);
+  border-color: var(--color-secondary);
+  color: var(--color-secondary-contrast);
 }
 
 .steps-kitchen-nav button:disabled {
