@@ -1,14 +1,17 @@
-# klakegg/hugo is archived/unmaintained (stuck around Hugo 0.83); hugomods/hugo
-# is the actively maintained successor. Pinned version is validated against
-# this site's theme (recipe-book) - see PLAN.md for the compatibility check.
-FROM hugomods/hugo:0.111.3 as builder
-
-COPY site /site
+# DESIGN.md §8 Option A: the deploy contract only requires the `builder`
+# stage to produce static output at /site/public — it doesn't know or care
+# that this used to be Hugo. Pinned to the Node version this repo is
+# developed against (see `node --version` locally), matching the
+# comment-documented pinning convention the old Hugo builder used.
+FROM node:22.23.2-alpine AS builder
 
 WORKDIR /site
 
-ENV HUGO_ENV=production
-RUN hugo
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
 
 
 
