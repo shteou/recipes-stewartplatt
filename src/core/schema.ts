@@ -26,6 +26,14 @@ const IngredientSchema = z.object({
   unit: z.string().optional(),
   note: z.string().optional(),
   optional: z.boolean().optional(),
+  /**
+   * Irregular plural override for a `{{Name:plural}}` step token (e.g. "Bay
+   * leaf" -> `plural: "Bay leaves"`), mirroring `serving_unit_plural`. Only
+   * needed when naive "+s" (`quantity.ts`'s `pluralizeIngredientName`) is
+   * wrong; a regular plural like "Garlic clove" -> "Garlic cloves" doesn't
+   * need it.
+   */
+  plural: z.string().optional(),
 });
 
 const SwapSchema = z.object({
@@ -36,6 +44,8 @@ const SwapSchema = z.object({
   quantity: z.number().optional(),
   unit: z.string().optional(),
   note: z.string().optional(),
+  /** Irregular plural override for the replacement `name`; see `Ingredient.plural`. */
+  plural: z.string().optional(),
 });
 
 const SubstitutionSchema = z.object({
@@ -131,10 +141,10 @@ function deriveSlug(sourceLabel: string | undefined, title: string): string {
 
 /**
  * Matches `{{Ingredient Name}}`, `{{Ingredient Name * 0.5}}`, and
- * `{{Ingredient Name:name}}` style tokens generically — the whole
- * inside-braces content is captured, and `extractTokenIngredientNames` below
- * is what strips the `* <multiplier>`/`:name` suffix to recover the bare
- * ingredient name to validate.
+ * `{{Ingredient Name:name}}`/`{{Ingredient Name:plural}}` style tokens
+ * generically — the whole inside-braces content is captured, and
+ * `extractTokenIngredientNames` below is what strips the `* <multiplier>`/
+ * `:name`/`:plural` suffix to recover the bare ingredient name to validate.
  */
 const TOKEN_PATTERN = /\{\{([^}]+)\}\}/g;
 
@@ -142,9 +152,9 @@ function extractTokenIngredientNames(text: string): string[] {
   const names: string[] = [];
   for (const match of text.matchAll(TOKEN_PATTERN)) {
     const raw = match[1].trim();
-    // Strip a trailing `* <multiplier>` (e.g. "Salt * 0.5") or `:name`
-    // suffix (e.g. "Ghee:name"), whichever comes first — a token only ever
-    // has one or the other, never both.
+    // Strip a trailing `* <multiplier>` (e.g. "Salt * 0.5") or `:name`/
+    // `:plural` suffix (e.g. "Ghee:name", "Bay leaf:plural"), whichever comes
+    // first — a token only ever has one of the three, never more.
     const starIndex = raw.indexOf("*");
     const colonIndex = raw.indexOf(":");
     const candidates = [starIndex, colonIndex].filter((i) => i !== -1);

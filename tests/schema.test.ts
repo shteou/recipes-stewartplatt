@@ -168,6 +168,38 @@ describe("parseRecipe — rejects broken input", () => {
     ).toBe(true);
   });
 
+  it("accepts a {{Name:plural}} token that references a real ingredient", () => {
+    const raw = makeValidRawRecipe({
+      steps: [
+        {
+          group: "Prep",
+          time: 10,
+          text: "Mix in the {{Flour:plural}} ({{Flour}}).",
+        },
+      ],
+    });
+    const result = parseRecipe(raw, "plural-token.md");
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a {{Name:plural}} token that references a nonexistent ingredient", () => {
+    const raw = makeValidRawRecipe({
+      steps: [
+        {
+          group: "Prep",
+          time: 10,
+          text: "Mix in the {{Unknown:plural}}.",
+        },
+      ],
+    });
+    const result = parseRecipe(raw, "dangling-plural-token.md");
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(
+      result.errors.some((e) => /unknown ingredient "Unknown"/.test(e)),
+    ).toBe(true);
+  });
+
   it("rejects a {{token}} with a multiplier that references a nonexistent ingredient", () => {
     const raw = makeValidRawRecipe({
       steps: [

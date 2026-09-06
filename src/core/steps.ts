@@ -60,12 +60,13 @@ export function filterActiveSteps<T extends { idle?: boolean }>(steps: T[]): T[]
 
 /**
  * Matches `{{Ingredient Name}}`, `{{Ingredient Name * 0.5}}`-style multiplier
- * tokens, and `{{Ingredient Name:name}}`-style name-reference tokens. Capture
- * groups: 1 = the ingredient name, 2 = the multiplier (if present), 3 = the
- * `:name` suffix (if present — its exact captured text isn't used, just its
- * presence). The multiplier and `:name` forms are mutually exclusive.
+ * tokens, and `{{Ingredient Name:name}}`/`{{Ingredient Name:plural}}`-style
+ * reference tokens. Capture groups: 1 = the ingredient name, 2 = the
+ * multiplier (if present), 3 = `"name"` or `"plural"` (if a `:name`/`:plural`
+ * suffix is present). The multiplier and `:name`/`:plural` forms are mutually
+ * exclusive.
  */
-const TOKEN_PATTERN = /\{\{\s*([^{}*:]+?)\s*(?:\*\s*([0-9.]+)|(:\s*name))?\s*\}\}/g;
+const TOKEN_PATTERN = /\{\{\s*([^{}*:]+?)\s*(?:\*\s*([0-9.]+)|:\s*(name|plural))?\s*\}\}/g;
 
 /**
  * Which of `quantity.ts`'s two formatters an ingredient's quantity should use
@@ -109,6 +110,15 @@ export interface TokenIngredient {
   unit?: string;
   displayQuantity?: string;
   quantityFormat: QuantityFormat;
+  /**
+   * `displayName` pluralised for this ingredient's final resolved `quantity`
+   * (`quantity.ts`'s `pluralizeIngredientName`, respecting `Ingredient.plural`
+   * / `Swap.plural`) — what a `{{Name:plural}}` token renders. Optional
+   * because callers that never use `:plural` tokens (e.g. existing tests)
+   * have no reason to compute it; `interpolateText` falls back to
+   * `displayName` when absent.
+   */
+  pluralDisplayName?: string;
 }
 
 function findIngredient(ingredients: TokenIngredient[], name: string): TokenIngredient | undefined {
@@ -149,15 +159,25 @@ function formatByConvention(value: number, format: QuantityFormat): string {
  * renders "Neutral oil" once the "Make this vegan" substitution swaps it in,
  * instead of the literal word "ghee" staying hardcoded in the surrounding
  * text regardless of which ingredient is actually in play.
+ *
+ * A `{{Name:plural}}` token is the same, but outputs `pluralDisplayName`
+ * (falling back to `displayName` if absent) — the ingredient's name
+ * pluralised for its own final resolved quantity, e.g. `{{Bay leaf:plural}}`
+ * renders "Bay leaf" at a single leaf but "Bay leaves" once scaling the
+ * recipe pushes that ingredient's quantity above 1. This is deliberately a
+ * separate, opt-in token rather than `:name` itself always pluralising,
+ * since not every ingredient name is a count noun — "Salt" or "Neutral oil"
+ * should never pluralise just because their `quantity` isn't 1.
  */
 export function interpolateText(text: string, ingredients: TokenIngredient[]): string {
   return text.replace(
     TOKEN_PATTERN,
-    (match, rawName: string, rawMultiplier: string | undefined, nameFlag: string | undefined) => {
+    (match, rawName: string, rawMultiplier: string | undefined, suffix: string | undefined) => {
       const ingredient = findIngredient(ingredients, rawName);
       if (!ingredient) return match;
 
-      if (nameFlag !== undefined) return ingredient.displayName;
+      if (suffix === "name") return ingredient.displayName;
+      if (suffix === "plural") return ingredient.pluralDisplayName ?? ingredient.displayName;
 
       if (ingredient.quantity == null) return ingredient.unit ?? "";
 

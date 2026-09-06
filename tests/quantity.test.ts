@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDecimal, formatQuantity, pluralizeServingUnit } from "../src/core/quantity.js";
+import { formatDecimal, formatQuantity, pluralizeIngredientName, pluralizeServingUnit } from "../src/core/quantity.js";
 
 describe("formatQuantity", () => {
   it("renders whole numbers plainly", () => {
@@ -77,5 +77,32 @@ describe("pluralizeServingUnit", () => {
 
   it("ignores the override when the count is 1", () => {
     expect(pluralizeServingUnit("medium", 1, "mediums")).toBe("medium");
+  });
+});
+
+describe("pluralizeIngredientName", () => {
+  it("keeps the singular form at quantity 1", () => {
+    expect(pluralizeIngredientName("Bay leaf", 1, "Bay leaves")).toBe("Bay leaf");
+  });
+
+  it("keeps the singular form for a quantity within tolerance of 1", () => {
+    expect(pluralizeIngredientName("Bay leaf", 1.01, "Bay leaves")).toBe("Bay leaf");
+  });
+
+  it("uses the override plural when quantity is not 1", () => {
+    expect(pluralizeIngredientName("Bay leaf", 2, "Bay leaves")).toBe("Bay leaves");
+    expect(pluralizeIngredientName("Bay leaf", 0.5, "Bay leaves")).toBe("Bay leaves");
+  });
+
+  it("naively appends 's' when there's no override", () => {
+    expect(pluralizeIngredientName("Garlic clove", 3)).toBe("Garlic cloves");
+  });
+
+  it("does not double an 's' already present", () => {
+    expect(pluralizeIngredientName("Curry leaves", 8)).toBe("Curry leaves");
+  });
+
+  it("returns the name unchanged when there's no quantity to pluralise against", () => {
+    expect(pluralizeIngredientName("Salt & pepper", undefined)).toBe("Salt & pepper");
   });
 });

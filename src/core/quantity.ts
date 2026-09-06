@@ -61,20 +61,45 @@ export function formatDecimal(value: number): string {
 }
 
 /**
- * Pluralise a `serving_unit` for the given count.
+ * Shared count/override/naive-plural decision behind `pluralizeServingUnit`
+ * and `pluralizeIngredientName`.
  *
  * - Counts within `FRACTION_TOLERANCE` of 1 (including fractional servings
  *   that round to "1", e.g. a `serving_step` of 0.5 landing on 1) keep the
  *   singular form.
- * - Otherwise, `override` (`Recipe.serving_unit_plural`) wins if provided.
- * - Otherwise, naive "+s" (skipped if the unit already ends in "s").
+ * - Otherwise, `override` wins if provided.
+ * - Otherwise, naive "+s" (skipped if the word already ends in "s").
  */
+function pluralize(word: string, count: number, override?: string): string {
+  if (Math.abs(count - 1) < FRACTION_TOLERANCE) return word;
+  if (override) return override;
+  return word.endsWith("s") ? word : `${word}s`;
+}
+
+/** Pluralise a `serving_unit` for the given count; see `pluralize`. */
 export function pluralizeServingUnit(
   unit: string,
   count: number,
   override?: string,
 ): string {
-  if (Math.abs(count - 1) < FRACTION_TOLERANCE) return unit;
-  if (override) return override;
-  return unit.endsWith("s") ? unit : `${unit}s`;
+  return pluralize(unit, count, override);
+}
+
+/**
+ * Pluralise an ingredient's name for a `{{Name:plural}}` step token, using
+ * the ingredient's final (scaled/substituted) `quantity` — e.g. "Bay leaf"
+ * stays singular at `quantity: 1` but becomes "Bay leaves" once scaling
+ * pushes it past 1, given `override: "Bay leaves"` (`Ingredient.plural` /
+ * `Swap.plural`; naive "+s" would wrongly give "Bay leafs").
+ *
+ * An ingredient with no `quantity` at all (a "to taste" entry) has no count
+ * to pluralise against, so it's always returned unchanged.
+ */
+export function pluralizeIngredientName(
+  name: string,
+  quantity: number | undefined,
+  override?: string,
+): string {
+  if (quantity == null) return name;
+  return pluralize(name, quantity, override);
 }

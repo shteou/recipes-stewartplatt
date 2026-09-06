@@ -11,7 +11,7 @@ import type { Ingredient, Recipe } from "./schema.js";
 import { scaleIngredients } from "./scale.js";
 import { applySwaps, getActiveSwapMap } from "./substitutions.js";
 import { convert, hasConvertibleUnit } from "./units.js";
-import { formatDecimal, formatQuantity, pluralizeServingUnit } from "./quantity.js";
+import { formatDecimal, formatQuantity, pluralizeIngredientName, pluralizeServingUnit } from "./quantity.js";
 import {
   assignGroupColors,
   filterActiveSteps,
@@ -217,6 +217,11 @@ export function present(recipe: Recipe, viewState: ViewState): RecipeViewModel {
     unit: ri.unit,
     displayQuantity: ri.displayQuantity,
     quantityFormat: resolvedQuantities[index].quantityFormat,
+    // For a `{{Name:plural}}` token — same substituted name, pluralised
+    // against this ingredient's own final quantity, honouring an active
+    // swap's `plural` override (falling back to the base ingredient's) via
+    // `substituted[index].plural`.
+    pluralDisplayName: pluralizeIngredientName(ri.name, ri.quantity, substituted[index].plural),
   }));
 
   // step token interpolation

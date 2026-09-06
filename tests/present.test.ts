@@ -104,6 +104,24 @@ describe("present — mixed-dal-tadka with the vegan substitution active", () =>
   });
 });
 
+describe("present — {{Bay leaf:plural}} tracks the ingredient's scaled quantity", () => {
+  it("stays singular at the recipe's base servings (quantity 1)", () => {
+    const recipe = loadReal("mixed-dal-tadka.md");
+    const vm = present(recipe, baseViewState(recipe));
+    const removeStep = vm.steps.find((s) => s.short?.includes("discard"));
+    expect(removeStep?.text).toContain("Remove the Bay leaf.");
+    expect(removeStep?.short).toBe("Mash; discard Bay leaf");
+  });
+
+  it("becomes plural once scaling pushes the quantity above 1", () => {
+    const recipe = loadReal("mixed-dal-tadka.md");
+    const vm = present(recipe, { ...baseViewState(recipe), servings: recipe.servings * 2 });
+    const removeStep = vm.steps.find((s) => s.short?.includes("discard"));
+    expect(removeStep?.text).toContain("Remove the Bay leaves.");
+    expect(removeStep?.short).toBe("Mash; discard Bay leaves");
+  });
+});
+
 describe("present — a substitution that overrides quantity/unit propagates into step tokens", () => {
   function makeSyntheticRecipe(): Recipe {
     const raw = {

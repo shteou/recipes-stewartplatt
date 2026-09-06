@@ -27,6 +27,7 @@ ingredients:
     unit: tsp
   - name: Bay leaf
     quantity: 1
+    plural: Bay leaves
   - name: Ghee
     quantity: 2
     unit: tbsp
@@ -71,16 +72,16 @@ steps:
     short: "Rinse chana ({{Chana dal}}) + mung ({{Mung dal}}) dal"
   - group: Lentils
     time: 55
-    text: "Add the rinsed dal to a pot with the water ({{Water}}), turmeric powder ({{Turmeric powder}}), bay leaf, and half of the salt ({{Salt * 0.5}}). Bring to a boil, then reduce heat and simmer, partially covered, until soft and starting to break down."
-    short: "Boil with water ({{Water}}), turmeric ({{Turmeric powder}}), bay leaf, salt ({{Salt * 0.5}})"
+    text: "Add the rinsed dal to a pot with the water ({{Water}}), turmeric powder ({{Turmeric powder}}), {{Bay leaf:plural}}, and half of the salt ({{Salt * 0.5}}). Bring to a boil, then reduce heat and simmer, partially covered, until soft and starting to break down."
+    short: "Boil with water ({{Water}}), turmeric ({{Turmeric powder}}), {{Bay leaf:plural}}, salt ({{Salt * 0.5}})"
   - group: Lentils
     time: 20
     idle: true
     text: "Simmering, partially covered — no action needed."
   - group: Lentils
     time: 15
-    text: "Remove the bay leaf. Whisk or lightly mash the dal to your preferred consistency (some like it chunky, some smooth). Set aside."
-    short: "Mash; discard bay leaf"
+    text: "Remove the {{Bay leaf:plural}}. Whisk or lightly mash the dal to your preferred consistency (some like it chunky, some smooth). Set aside."
+    short: "Mash; discard {{Bay leaf:plural}}"
   - group: Tadka
     time: 15
     text: "In a small pan, heat the {{Ghee:name}} ({{Ghee}}) over medium heat. Add the cumin seeds ({{Cumin seeds}}) and let them sizzle for a few seconds, then add the curry leaves ({{Curry leaves}}) and let them crackle."

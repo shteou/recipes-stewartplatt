@@ -43,8 +43,8 @@ export function getActiveSwapMap(
 /**
  * Return a new ingredient list with every ingredient referenced by an active
  * swap replaced by its substitute. The substitute's `name` always replaces
- * the display name; `quantity`/`unit`/`note` fall back to the original
- * ingredient's values when the swap doesn't specify its own (e.g.
+ * the display name; `quantity`/`unit`/`note`/`plural` fall back to the
+ * original ingredient's values when the swap doesn't specify its own (e.g.
  * `mixed-dal-tadka`'s "Make this vegan" swap only specifies `name` + `note`,
  * so the replacement keeps Ghee's original quantity/unit).
  *
@@ -69,6 +69,7 @@ export function applySwaps(
       unit: swap.unit ?? ingredient.unit,
       note: swap.note ?? ingredient.note,
       optional: ingredient.optional,
+      plural: swap.plural ?? ingredient.plural,
     };
   });
 }

@@ -204,6 +204,52 @@ describe("interpolateText — {{Name:name}} token", () => {
   });
 });
 
+describe("interpolateText — {{Name:plural}} token", () => {
+  const singular: TokenIngredient[] = [
+    {
+      name: "Bay leaf",
+      displayName: "Bay leaf",
+      pluralDisplayName: "Bay leaf",
+      quantity: 1,
+      displayQuantity: "1",
+      quantityFormat: "fraction",
+    },
+  ];
+  const scaledUp: TokenIngredient[] = [
+    {
+      name: "Bay leaf",
+      displayName: "Bay leaf",
+      pluralDisplayName: "Bay leaves",
+      quantity: 2,
+      displayQuantity: "2",
+      quantityFormat: "fraction",
+    },
+  ];
+
+  it("outputs the singular form at quantity 1", () => {
+    expect(interpolateText("Remove the {{Bay leaf:plural}}.", singular)).toBe("Remove the Bay leaf.");
+  });
+
+  it("outputs the plural form once quantity scales past 1", () => {
+    expect(interpolateText("Remove the {{Bay leaf:plural}}.", scaledUp)).toBe("Remove the Bay leaves.");
+  });
+
+  it("falls back to displayName when pluralDisplayName is absent", () => {
+    const ingredients: TokenIngredient[] = [
+      { name: "Ghee", displayName: "Ghee", quantity: 2, unit: "tbsp", displayQuantity: "2", quantityFormat: "fraction" },
+    ];
+    expect(interpolateText("{{Ghee:plural}}", ingredients)).toBe("Ghee");
+  });
+
+  it("leaves an unmatched {{Name:plural}} token exactly as written", () => {
+    expect(interpolateText("{{Sugar:plural}}", singular)).toBe("{{Sugar:plural}}");
+  });
+
+  it("is case- and whitespace-insensitive when matching ingredient names for a :plural token", () => {
+    expect(interpolateText("{{ bay leaf : plural }}", scaledUp)).toBe("Bay leaves");
+  });
+});
+
 describe("timeRange", () => {
   it("returns [time, time] for a step with a normal numeric time", () => {
     expect(timeRange(step({ group: "Prep", time: 10, text: "a" }))).toEqual([10, 10]);

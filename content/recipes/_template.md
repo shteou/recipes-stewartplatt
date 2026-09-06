@@ -83,6 +83,12 @@ ingredients:
     quantity: 2
     unit: tbsp
   - name: Salt & pepper       # an ingredient with no quantity/unit at all — "to taste" style, valid as-is.
+  - name: Bay leaf
+    quantity: 1
+    # plural: "Bay leaves"    # optional string. Irregular-plural override for this ingredient's name, used by
+                              # a `{{Bay leaf:plural}}` step token (see `steps:` below) — naive "+s" would
+                              # otherwise give the wrong "Bay leafs" once scaling pushes quantity past 1. Omit
+                              # when naive "+s" is already correct (e.g. "Garlic clove" -> "Garlic cloves").
 
 # optional. One or more named substitution "toggles" a viewer can switch on
 # in the ingredients list; each swaps out one or more ingredients for a
@@ -113,8 +119,14 @@ steps:
                                        # full instruction. May reference an ingredient's resolved amount with
                                        # `{{Ingredient Name}}` (must match an `ingredients[].name` above exactly,
                                        # case-insensitive), or a fraction of it with `{{Ingredient Name * 0.5}}`
-                                       # — e.g. a step that only uses half the salt. These interpolate live
-                                       # against the current servings/unit-system/substitution state.
+                                       # — e.g. a step that only uses half the salt. Or its current (possibly
+                                       # substituted) name with `{{Ingredient Name:name}}` — e.g. "Chicken
+                                       # breasts" becomes "Firm tofu" once "Make this vegan" is active — or that
+                                       # name pluralised for its own scaled quantity with
+                                       # `{{Ingredient Name:plural}}`, e.g. "Remove the {{Bay leaf:plural}}."
+                                       # reads "Remove the Bay leaf." at quantity 1 but "Remove the Bay leaves."
+                                       # once scaling pushes it past 1 (see `plural:` above). These interpolate
+                                       # live against the current servings/unit-system/substitution state.
     short: "Season chicken ({{Chicken breasts}})"   # optional string. Terse phrasing shown in Kitchen mode;
                                        # falls back to `text` when omitted. Supports the same `{{tokens}}`.
     # idle: true                      # optional boolean. Marks a passive/waiting step (e.g. "simmer, no
