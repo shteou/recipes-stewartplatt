@@ -4,7 +4,7 @@ description: "Mixed Dal Tadka"
 summary: "Chana dal and mung dal simmered with bay leaf, finished with a cumin-curry leaf-garlic tempering and garam masala"
 date: 2026-09-05
 draft: false
-time: "30m"
+time: "60m"
 tags: ["indian", "vegetarian", "vegan", "lentils"]
 featured_image: "/flags/in.svg"
 servings: 4
@@ -65,20 +65,46 @@ substitutions:
       - ingredient: Ghee
         name: Neutral oil
         note: or vegan butter
+steps:
+  - group: Lentils
+    time: 60
+    text: "Rinse the chana dal and mung dal together under cold water until it runs mostly clear."
+    short: "Rinse chana + mung dal"
+  - group: Lentils
+    time: 55
+    text: "Add the rinsed dal to a pot with the water, turmeric powder, bay leaf, and half of the salt. Bring to a boil, then reduce heat and simmer, partially covered, until soft and starting to break down."
+    short: "Boil with water, turmeric, bay leaf, ½ salt"
+  - group: Lentils
+    time: 20
+    idle: true
+    text: "Simmering, partially covered — no action needed."
+  - group: Lentils
+    time: 15
+    text: "Remove the bay leaf. Whisk or lightly mash the dal to your preferred consistency (some like it chunky, some smooth). Set aside."
+    short: "Mash; discard bay leaf"
+  - group: Tadka
+    time: 15
+    text: "In a small pan, heat the ghee over medium heat. Add the cumin seeds and let them sizzle for a few seconds, then add the curry leaves and let them crackle."
+    short: "Bloom cumin + curry leaves in ghee"
+  - group: Tadka
+    time: 10
+    text: "Add the garlic and onion. Sauté until the onion turns golden."
+    short: "Sauté garlic + onion till golden"
+  - group: Tadka
+    time: 5
+    text: "Add the tomato, coriander powder, and red chili powder. Cook until the tomatoes soften and the oil starts to separate."
+    short: "Add tomato + spices, cook till oil separates"
+  - group: Combine
+    time: 2
+    text: "Pour the tempering into the cooked dal. Add the remaining salt to taste, and stir well. Simmer everything together for a couple minutes to let the flavors meld."
+    short: "Combine, add rest of salt, simmer 2 min"
+  - group: Combine
+    time: 0
+    text: "Turn off the heat and stir in the garam masala. Serve hot with rice or roti."
+    short: "Stir in garam masala, serve"
 ---
 
-Comforting, protein-rich, ready in about 30 minutes.
-
-## Directions
-
-1. Rinse the dals: rinse the chana dal and mung dal together under cold water until it runs mostly clear.
-1. Cook the dal: add the rinsed dal to a pot with the water, turmeric powder, bay leaf, and half of the salt. Bring to a boil, then reduce heat and simmer, partially covered, until soft and starting to break down.
-1. Mash lightly: remove the bay leaf. Whisk or lightly mash the dal to your preferred consistency (some like it chunky, some smooth). Set aside.
-1. Make the tempering: in a small pan, heat the ghee over medium heat. Add the cumin seeds and let them sizzle for a few seconds, then add the curry leaves and let them crackle.
-1. Sauté aromatics: add the garlic and onion. Sauté until the onion turns golden.
-1. Add tomato and spices: add the tomato, coriander powder, and red chili powder. Cook until the tomatoes soften and the oil starts to separate.
-1. Combine: pour the tempering into the cooked dal. Add the remaining salt to taste, and stir well. Simmer everything together for a couple minutes to let the flavors meld.
-1. Finish and serve: turn off the heat and stir in the garam masala. Serve hot with rice or roti.
+Comforting, protein-rich, ready in about 50-60 minutes.
 
 ## Serving suggestions
 

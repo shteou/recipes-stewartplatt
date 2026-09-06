@@ -20,19 +20,44 @@ ingredients:
     unit: oz
   - name: Large onion
     quantity: 1
+steps:
+  - group: Prep
+    time: 120
+    text: "Salt and pepper the chicken breasts."
+    short: "Season chicken"
+  - group: Prep
+    time: 118
+    text: "Dice the onions."
+    short: "Dice onion"
+  - group: Sear
+    time: 110
+    text: "Add some of the butter to a pot and brown the chicken (you may need to do this in batches)."
+    short: "Brown chicken in batches"
+  - group: Sear
+    time: 100
+    text: "Remove the browned chicken and set aside."
+    short: "Set browned chicken aside"
+  - group: Sauce
+    time: 97
+    text: "Add the remainder of the butter and heat until the butter browns."
+    short: "Brown remaining butter"
+  - group: Sauce
+    time: 94
+    text: "Add the onions and cook until partially softened."
+    short: "Cook onions till softened"
+  - group: Sauce
+    time: 91
+    text: "Return the chicken to the pot."
+    short: "Return chicken to pot"
+  - group: Sauce
+    time: 90
+    text: "Add the sherry, and enough water to cover."
+    short: "Add sherry + water to cover"
+  - group: Sauce
+    time: 89
+    idle: true
+    text: "Boil for about 30 minutes, then simmer for another hour."
 ---
-
-## Directions
-
-1. Salt and pepper the chicken breasts
-1. Dice the onions
-1. Add some of the butter to a pot and brown the chicken (you may need to do this in batches)
-1. Remove the browned chicken and set aside
-1. Add the remainder of the butter and heat until the butter browns
-1. Add the onions until partially cooked
-1. Return the chicken to the pot
-1. Add the sherry, and enoough water to cover
-1. Boil for about 30 minutes, then simmer for another hour
 
 ## Serving suggestions
 

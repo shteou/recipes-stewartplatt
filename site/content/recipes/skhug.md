@@ -30,18 +30,40 @@ ingredients:
     optional: true
   - name: Extra Virgin Olive Oil
   - name: Salt & Pepper
+steps:
+  - group: Prep
+    time: 20
+    text: "Roughly chop the chillis, deseeding first if you want less heat."
+    short: "Chop chillis"
+  - group: Prep
+    time: 18
+    text: "Peel the garlic cloves."
+    short: "Peel garlic"
+  - group: Prep
+    time: 16
+    text: "Roughly chop the coriander."
+    short: "Chop coriander"
+  - group: Prep
+    time: 14
+    text: "Dice the tomato and/or pepper, if using."
+    short: "Dice tomato/pepper (optional)"
+  - group: Blend
+    time: 10
+    text: "Combine the above ingredients in a blender and blitz."
+    short: "Blitz in blender"
+  - group: Blend
+    time: 6
+    text: "Add the cumin and the juice of the lime."
+    short: "Add cumin + lime juice"
+  - group: Blend
+    time: 3
+    text: "Add salt and pepper to taste."
+    short: "Season with salt + pepper"
+  - group: Jar
+    time: 0
+    text: "Decant into a clean jar/pot and finish with a layer of oil."
+    short: "Jar it, top with oil"
 ---
-
-## Directions
-
-1. Roughly chop (optionally deseeding) the chillis
-1. Peel the garlic cloves
-1. Roughly chop the coriander
-1. Dice the tomato and/or pepper
-1. Combine the above ingredients in a blender and blitz
-1. Add the cumin and the juice of the lime
-1. Add salt and pepper to taste
-1. Decant into a clean jar/pot and finish with a layer of oil
 
 ## Serving suggestions
 
