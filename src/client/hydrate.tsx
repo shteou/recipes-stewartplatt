@@ -36,7 +36,7 @@ import { IngredientList } from "../view/IngredientList.js";
 import { StepsGrouped } from "../view/StepsGrouped.js";
 import { StepsTimeline } from "../view/StepsTimeline.js";
 import { StepsMise } from "../view/StepsMise.js";
-import { StepsKitchen, type KitchenSubmode } from "../view/StepsKitchen.js";
+import { StepsKitchen, type KitchenSubmode, type KitchenTimerState } from "../view/StepsKitchen.js";
 
 const STEPS_VIEW_MODES: StepsViewMode[] = ["grouped", "timeline", "mise", "kitchen"];
 
@@ -342,11 +342,167 @@ function init(): void {
   // switching sub-view or stepping through the one-at-a-time view never
   // triggers a `present()` recompute, just a re-render of the Kitchen
   // section's own markup fed by `lastVm` (see `renderKitchenSection` below).
+  //
+  // `kitchenStepIndex` indexes into `vm.steps` (the full, unfiltered list —
+  // see `StepsKitchen.tsx`'s docstring), not `vm.activeSteps`.
+  //
+  // Neither this nor `kitchenSubmode` (nor the timer state below) is
+  // persisted to localStorage: they're transient "where am I right now"
+  // navigation position, not a saved choice, and a reload restoring a
+  // countdown for a step the user isn't currently looking at (since
+  // `kitchenSubmode`/`kitchenStepIndex` themselves reset to their defaults
+  // on load) would be more confusing than helpful.
   // -------------------------------------------------------------------
 
   let kitchenSubmode: KitchenSubmode = "checklist";
   let kitchenStepIndex = 0;
   let lastVm: ReturnType<typeof present> | null = null;
+
+  // -------------------------------------------------------------------
+  // Kitchen mode: idle-step countdown timer.
+  //
+  // `Step.time` is "minutes remaining until done, counting down to 0" (see
+  // `core/schema.ts`), not a per-step duration — so an idle step's own wait
+  // duration is derived as the delta between it and the *previous* full
+  // step's `time` (idle steps occupy real time on the countdown just like
+  // active ones, so `vm.steps`, not `vm.activeSteps`, is the right list to
+  // walk). There's no previous step to diff against when `stepIndex === 0`
+  // (an idle step can't meaningfully be the very first step in a recipe
+  // written this way, but nothing stops content from doing it) — that case
+  // has no derivable duration, and `StepsKitchen` renders a no-timer message
+  // instead of guessing.
+  //
+  // Uses a wall-clock `startedAt` timestamp + fixed `durationMs`, with
+  // remaining time always recomputed from `Date.now()` (never a
+  // decrementing tick counter), so an interval throttled or entirely paused
+  // by a backgrounded tab still reports the correct remaining time the
+  // moment it's checked again — exactly the same reasoning as this file's
+  // wake-lock handling below.
+  // -------------------------------------------------------------------
+
+  interface KitchenTimer {
+    stepIndex: number;
+    startedAt: number;
+    durationMs: number;
+    finished: boolean;
+  }
+
+  let kitchenTimer: KitchenTimer | null = null;
+  let kitchenTimerIntervalId: number | null = null;
+
+  /** The idle wait duration (minutes) for `vm.steps[stepIndex]`, or 0 when it can't be derived (see above). */
+  function idleDurationMinutes(vm: ReturnType<typeof present>, stepIndex: number): number {
+    if (stepIndex <= 0) return 0;
+    const previous = vm.steps[stepIndex - 1]?.time;
+    const current = vm.steps[stepIndex]?.time;
+    if (typeof previous !== "number" || typeof current !== "number") return 0;
+    return Math.max(0, previous - current);
+  }
+
+  function playTimerAlert(): void {
+    // Web Audio API beep — wrapped defensively: autoplay/audio policy can
+    // reject this outright in some browsers/contexts, and that must never
+    // surface as an error.
+    try {
+      const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.frequency.value = 880;
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.start();
+        oscillator.stop(ctx.currentTime + 0.6);
+        oscillator.addEventListener("ended", () => void ctx.close().catch(() => {}));
+      }
+    } catch {
+      // no Web Audio support, or blocked — silently skip the beep
+    }
+    try {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("Timer done", { body: "Your recipe's waiting step is finished." });
+      }
+    } catch {
+      // Notification unsupported/blocked — silently skip
+    }
+    try {
+      navigator.vibrate?.(200);
+    } catch {
+      // no vibration support — silently skip
+    }
+  }
+
+  function stopKitchenTimerTicking(): void {
+    if (kitchenTimerIntervalId !== null) {
+      window.clearInterval(kitchenTimerIntervalId);
+      kitchenTimerIntervalId = null;
+    }
+  }
+
+  function startKitchenTimerTicking(): void {
+    if (kitchenTimerIntervalId !== null) return;
+    kitchenTimerIntervalId = window.setInterval(() => {
+      if (!kitchenTimer) {
+        stopKitchenTimerTicking();
+        return;
+      }
+      const remaining = kitchenTimer.durationMs - (Date.now() - kitchenTimer.startedAt);
+      if (remaining <= 0 && !kitchenTimer.finished) {
+        kitchenTimer.finished = true;
+        playTimerAlert();
+        stopKitchenTimerTicking(); // remaining stays clamped at 0 from here — nothing left to tick
+      }
+      renderKitchenSection();
+    }, 500);
+  }
+
+  // Builds the `timer` prop for whichever step `kitchenStepIndex` currently
+  // points at — `null` unless that exact step has a live/finished timer.
+  function currentTimerProp(): KitchenTimerState | null {
+    if (!kitchenTimer || kitchenTimer.stepIndex !== kitchenStepIndex) return null;
+    const remainingMs = Math.max(0, kitchenTimer.durationMs - (Date.now() - kitchenTimer.startedAt));
+    return {
+      stepIndex: kitchenTimer.stepIndex,
+      remainingMs,
+      durationMs: kitchenTimer.durationMs,
+      finished: kitchenTimer.finished || remainingMs <= 0,
+    };
+  }
+
+  // Starts (or resumes ticking) a timer for the currently-displayed step, if
+  // it's `idle` and has a derivable duration; stops ticking (without
+  // discarding timer state — navigating back to it later should resume, not
+  // restart) when the current step isn't the one the running timer belongs
+  // to. Called after every Back/Next/sub-view-switch interaction.
+  function syncKitchenTimerForCurrentStep(): void {
+    if (!lastVm) return;
+    const step = lastVm.steps[kitchenStepIndex];
+    if (!step?.idle) {
+      stopKitchenTimerTicking();
+      return;
+    }
+    if (!kitchenTimer || kitchenTimer.stepIndex !== kitchenStepIndex) {
+      const durationMinutes = idleDurationMinutes(lastVm, kitchenStepIndex);
+      kitchenTimer =
+        durationMinutes > 0
+          ? { stepIndex: kitchenStepIndex, startedAt: Date.now(), durationMs: durationMinutes * 60_000, finished: false }
+          : null;
+      // Requesting permission here (rather than eagerly on page load) ties
+      // it to a genuine user gesture (the Back/Next/sub-view click that led
+      // here), which browsers require anyway for the prompt to appear at
+      // all — and only asks once (`"default"` means "never asked").
+      try {
+        if (kitchenTimer && "Notification" in window && Notification.permission === "default") {
+          void Notification.requestPermission().catch(() => {});
+        }
+      } catch {
+        // Notification API unsupported — silently skip
+      }
+    }
+    if (kitchenTimer) startKitchenTimerTicking();
+  }
 
   // -------------------------------------------------------------------
   // Rendering — reuse the exact SSR components via Preact's render().
@@ -393,7 +549,7 @@ function init(): void {
     if (stepsSections.kitchen) {
       mount(
         stepsSections.kitchen,
-        <StepsKitchen vm={vm} currentIndex={kitchenStepIndex} submode={kitchenSubmode} />,
+        <StepsKitchen vm={vm} currentIndex={kitchenStepIndex} submode={kitchenSubmode} timer={currentTimerProp()} />,
       );
     }
 
@@ -416,7 +572,7 @@ function init(): void {
     if (!stepsSections.kitchen || !lastVm) return;
     mount(
       stepsSections.kitchen,
-      <StepsKitchen vm={lastVm} currentIndex={kitchenStepIndex} submode={kitchenSubmode} />,
+      <StepsKitchen vm={lastVm} currentIndex={kitchenStepIndex} submode={kitchenSubmode} timer={currentTimerProp()} />,
     );
     bindChecklist("kitchen");
   }
@@ -555,8 +711,10 @@ function init(): void {
 
       if (target === "kitchen" && previousView !== "kitchen") {
         void acquireWakeLock();
+        syncKitchenTimerForCurrentStep();
       } else if (target !== "kitchen" && previousView === "kitchen") {
         releaseWakeLock();
+        stopKitchenTimerTicking(); // timer state itself is kept — resumes correctly if the user switches back
       }
 
       persistState();
@@ -597,16 +755,30 @@ function init(): void {
       const mode = submodeBtn.dataset.kitchenSubmodeTarget;
       if (mode === "checklist" || mode === "single") {
         kitchenSubmode = mode;
+        if (mode === "single") syncKitchenTimerForCurrentStep();
+        else stopKitchenTimerTicking(); // checklist view can't display idle steps/timers at all
         renderKitchenSection();
       }
       return;
     }
 
+    const restartBtn = target.closest<HTMLButtonElement>("[data-kitchen-timer-restart]");
+    if (restartBtn) {
+      if (kitchenTimer && kitchenTimer.stepIndex === kitchenStepIndex) {
+        kitchenTimer.startedAt = Date.now();
+        kitchenTimer.finished = false;
+        startKitchenTimerTicking();
+      }
+      renderKitchenSection();
+      return;
+    }
+
     const navBtn = target.closest<HTMLButtonElement>("[data-kitchen-step-nav]");
     if (navBtn && !navBtn.disabled) {
-      const stepCount = lastVm?.activeSteps.length ?? 0;
+      const stepCount = lastVm?.steps.length ?? 0;
       if (navBtn.dataset.kitchenStepNav === "next" && kitchenStepIndex < stepCount - 1) kitchenStepIndex++;
       else if (navBtn.dataset.kitchenStepNav === "back" && kitchenStepIndex > 0) kitchenStepIndex--;
+      syncKitchenTimerForCurrentStep();
       renderKitchenSection();
     }
   });
